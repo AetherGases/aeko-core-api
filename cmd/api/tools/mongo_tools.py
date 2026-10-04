@@ -9,6 +9,22 @@ from langchain_core.tools import Tool, create_schema_from_function
 
 from internal.shared import Module, logged
 
+from cmd.api.tools.constants import (
+    GET_IMPROVEMENT_PLAN_BY_INVENTORY_DESCRIPTION,
+    GET_IMPROVEMENT_PLAN_PROBLEM_DESCRIPTION,
+    GET_IMPROVEMENT_PLAN_METHOD_DESCRIPTION,
+    GET_IMPROVEMENT_PLAN_REASONING_DESCRIPTION,
+    LIST_LATEST_IMPROVEMENT_PLANS_DESCRIPTION,
+    GET_USER_PROFILE_BY_EXTERNAL_ID_DESCRIPTION,
+    LIST_USER_MEMORY_FIELDS_DESCRIPTION,
+    GET_USER_MEMORY_BY_FIELD_DESCRIPTION,
+    LIST_USER_MEMORIES_DESCRIPTION,
+    LIST_USER_SESSION_NAMES_DESCRIPTION,
+    GET_SESSION_MESSAGES_BY_NAME_DESCRIPTION,
+    GET_LATEST_SESSION_MESSAGES_DESCRIPTION,
+    COUNT_USER_SESSIONS_DESCRIPTION,
+)
+
 from improvement_plan.entity import ImprovementPlan
 from session.entity import Message, Session
 from user.entity import User, UserMemory
@@ -213,22 +229,6 @@ def _get_improvement_plan_reasoning(id_external_inventory: int) -> list[dict[str
     return _plan_by_inventory(id_external_inventory, ("id_external_inventory", "reasoning"))
 
 
-@logged(Module.TOOL, "search_improvement_plans_by_problem")
-def _search_improvement_plans_by_problem(problem_text: str) -> list[dict[str, Any]]:
-    """Search improvement plans whose defined problem matches the supplied text."""
-
-    needle = _required_text(problem_text, "problem_text")
-    return [_plan_catalog(plan) for plan in _plans().search_by_defined_problem(needle)][:20]
-
-
-@logged(Module.TOOL, "search_improvement_plans_by_method")
-def _search_improvement_plans_by_method(method_text: str) -> list[dict[str, Any]]:
-    """Search improvement plans whose method matches the supplied text."""
-
-    needle = _required_text(method_text, "method_text")
-    return [_plan_catalog(plan) for plan in _plans().search_by_method(needle)][:20]
-
-
 @logged(Module.TOOL, "list_latest_improvement_plans")
 def _list_latest_improvement_plans(n: int) -> list[dict[str, Any]]:
     """Return the n most recently updated improvement plans."""
@@ -352,61 +352,27 @@ def get_improvement_plan_tools() -> list[Tool]:
     return [
         _typed_tool(
             "get_improvement_plan_by_inventory",
-            (
-                "Return the improvement plan for one inventory, including the defined "
-                "problem, method, reasoning, and update time. Pass id_external_inventory "
-                "as a positive integer such as 502."
-            ),
+            GET_IMPROVEMENT_PLAN_BY_INVENTORY_DESCRIPTION,
             _get_improvement_plan_by_inventory,
         ),
         _typed_tool(
             "get_improvement_plan_problem",
-            (
-                "Return only the defined problem of an inventory's improvement plan. "
-                "Pass id_external_inventory as a positive integer such as 502."
-            ),
+            GET_IMPROVEMENT_PLAN_PROBLEM_DESCRIPTION,
             _get_improvement_plan_problem,
         ),
         _typed_tool(
             "get_improvement_plan_method",
-            (
-                "Return only the method of an inventory's improvement plan. "
-                "Pass id_external_inventory as a positive integer such as 502."
-            ),
+            GET_IMPROVEMENT_PLAN_METHOD_DESCRIPTION,
             _get_improvement_plan_method,
         ),
         _typed_tool(
             "get_improvement_plan_reasoning",
-            (
-                "Return only the reasoning of an inventory's improvement plan. "
-                "Pass id_external_inventory as a positive integer such as 502."
-            ),
+            GET_IMPROVEMENT_PLAN_REASONING_DESCRIPTION,
             _get_improvement_plan_reasoning,
         ),
         _typed_tool(
-            "search_improvement_plans_by_problem",
-            (
-                "Search improvement plans whose defined problem mentions a phrase "
-                'such as "flaring". Pass problem_text as nonempty text; at most '
-                "20 matching plans are returned."
-            ),
-            _search_improvement_plans_by_problem,
-        ),
-        _typed_tool(
-            "search_improvement_plans_by_method",
-            (
-                "Search improvement plans whose method mentions a phrase such as "
-                '"PDCA". Pass method_text as nonempty text; at most 20 matching '
-                "plans are returned."
-            ),
-            _search_improvement_plans_by_method,
-        ),
-        _typed_tool(
             "list_latest_improvement_plans",
-            (
-                "List the most recently updated improvement plans. Pass n as a "
-                "positive integer such as 3 for how many plans to return, newest first."
-            ),
+            LIST_LATEST_IMPROVEMENT_PLANS_DESCRIPTION,
             _list_latest_improvement_plans,
         ),
     ]
@@ -418,35 +384,22 @@ def get_user_memory_tools() -> list[Tool]:
     return [
         _typed_tool(
             "get_user_profile_by_external_id",
-            (
-                "Return the role and usecase for one user. Pass id_external_user "
-                "as a positive integer such as 12345."
-            ),
+            GET_USER_PROFILE_BY_EXTERNAL_ID_DESCRIPTION,
             _get_user_profile_by_external_id,
         ),
         _typed_tool(
             "list_user_memory_fields",
-            (
-                "List the memory field names stored for one user. Pass "
-                "id_external_user as a positive integer such as 12345."
-            ),
+            LIST_USER_MEMORY_FIELDS_DESCRIPTION,
             _list_user_memory_fields,
         ),
         _typed_tool(
             "get_user_memory_by_field",
-            (
-                "Return one memory's field and description for a user. Pass "
-                "id_external_user as a positive integer such as 12345 and field "
-                'as a nonempty name such as "preferred_language".'
-            ),
+            GET_USER_MEMORY_BY_FIELD_DESCRIPTION,
             _get_user_memory_by_field,
         ),
         _typed_tool(
             "list_user_memories",
-            (
-                "List every memory field and description for one user. Pass "
-                "id_external_user as a positive integer such as 12345."
-            ),
+            LIST_USER_MEMORIES_DESCRIPTION,
             _list_user_memories,
         ),
     ]
@@ -458,37 +411,22 @@ def get_session_tools() -> list[Tool]:
     return [
         _typed_tool(
             "list_user_session_names",
-            (
-                "List conversation session names for one user, without messages. "
-                "Pass id_external_user as a positive integer such as 12345."
-            ),
+            LIST_USER_SESSION_NAMES_DESCRIPTION,
             _list_user_session_names,
         ),
         _typed_tool(
             "get_session_messages_by_name",
-            (
-                "Return the messages of one named conversation session for a user. "
-                "Pass id_external_user as a positive integer such as 12345 and "
-                'session_name as a nonempty name such as "Weekly emissions review".'
-            ),
+            GET_SESSION_MESSAGES_BY_NAME_DESCRIPTION,
             _get_session_messages_by_name,
         ),
         _typed_tool(
             "get_latest_session_messages",
-            (
-                "Return the newest messages of one named conversation session. "
-                "Pass id_external_user as a positive integer such as 12345, "
-                'session_name as a nonempty name such as "Weekly emissions review", '
-                "and n as a positive integer such as 5."
-            ),
+            GET_LATEST_SESSION_MESSAGES_DESCRIPTION,
             _get_latest_session_messages,
         ),
         _typed_tool(
             "count_user_sessions",
-            (
-                "Count conversation sessions belonging to one user. Pass "
-                "id_external_user as a positive integer such as 12345."
-            ),
+            COUNT_USER_SESSIONS_DESCRIPTION,
             _count_user_sessions,
         ),
     ]

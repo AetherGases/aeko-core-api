@@ -15,7 +15,12 @@ from pymongo import MongoClient
 from redis import Redis
 
 from cmd.api.integrations.climatiq_api import get_climatiq_tools
-from cmd.api.integrations.mcp.chroma_mcp import CHROMA_SESSION, get_gases_info_tools
+from cmd.api.integrations.mcp.chroma_mcp import (
+    CHROMA_SESSION,
+    configure as configure_chroma_tools,
+    get_gases_info_tools,
+    get_improvement_plan_problem_tools,
+)
 from cmd.api.tools.mongo_tools import (
     configure as configure_mongo_tools,
     get_improvement_plan_tools,
@@ -95,7 +100,9 @@ TAVILY_SITE_MAP_TOOLS = [AekoTool(tool=tool) for tool in get_tavily_site_map_too
 TAVILY_RESEARCH_TOOLS = [AekoTool(tool=tool) for tool in get_tavily_search_tools()]
 
 
-IMPROVEMENT_PLAN_TOOLS = [AekoTool(tool=tool) for tool in get_improvement_plan_tools()]
+IMPROVEMENT_PLAN_TOOLS = [AekoTool(tool=tool) for tool in get_improvement_plan_tools()] + [
+    AekoTool(tool=tool) for tool in get_improvement_plan_problem_tools()
+]
 USER_MEMORY_TOOLS = [AekoTool(tool=tool) for tool in get_user_memory_tools()]
 SESSION_TOOLS = [AekoTool(tool=tool) for tool in get_session_tools()]
 
@@ -382,6 +389,10 @@ async def lifespan(app: FastAPI):
             inactivity_minutes=SESSION_INACTIVITY_MINUTES,
         ),
     )
+    configure_chroma_tools(
+        users=UserService(UserRepository(db)),
+        improvement_plans=ImprovementPlanService(ImprovementPlanRepository(db)),
+    )
 
     if MCP_WARM_UP.strip().lower() not in {"false", "0", "no"}:
         _warm_up_mcp_sessions()
@@ -389,6 +400,7 @@ async def lifespan(app: FastAPI):
     yield
 
     configure_mongo_tools()
+    configure_chroma_tools()
     set_event_sink(None)
     set_aeko_metrics_sink(None)
 

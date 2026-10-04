@@ -45,6 +45,7 @@ def test_package_constants_have_one_definition_module(package):
         ("internal/shared", "APP_NAME", "custom-hub", "custom-hub"),
         ("internal/shared", "FAILING_STATUS", "499", 499),
         ("cmd/api/tools", "CALCULATOR_MAX_EXPRESSION_LENGTH", "200", 200),
+        ("cmd/api/tools", "GET_IMPROVEMENT_PLAN_BY_INVENTORY_DESCRIPTION", "plan from env", "plan from env"),
         ("cmd/api/integrations/mcp", "DEFAULT_CALL_TIMEOUT", "17.5", 17.5),
         ("cmd/memory_generator_worker", "SESSION_INACTIVITY_MINUTES", "30", 30),
     ],

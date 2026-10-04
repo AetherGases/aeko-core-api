@@ -75,6 +75,27 @@ def test_get_user_returns_the_user_entity():
     )
 
 
+def test_get_user_maps_id_external_company():
+    """Verify that get user maps id external company."""
+    repository, _ = build_repository(
+        user=StubCollection(find_one_result={**USER_DOCUMENT, "id_external_company": 90})
+    )
+
+    assert repository.get_user(12345).id_external_company == 90
+
+
+def test_set_id_external_company_updates_the_user_document():
+    """Verify that set id external company updates the user document."""
+    collection = StubCollection(find_one_result=USER_DOCUMENT)
+    repository, _ = build_repository(user=collection)
+
+    repository.set_id_external_company(ID_USER, 90)
+
+    query, update = collection.call_args("update_one")[0]
+    assert query == q.get_user_query(ID_USER)[0]
+    assert update == {"$set": {"id_external_company": 90}}
+
+
 def test_get_user_queries_by_the_external_identifier():
     """Verify that get user queries by the external identifier."""
     collection = StubCollection(find_one_result=USER_DOCUMENT)
@@ -217,6 +238,13 @@ def test_get_user_query_filter_targets_the_external_identifier():
 def test_get_user_query_filter_keeps_the_external_identifier_a_number():
     """Verify that get user query filter keeps the external identifier a number."""
     assert isinstance(q.get_user_query_filter(12345)["id_external_user"], int)
+
+
+def test_set_id_external_company_query_sets_the_company():
+    """Verify that set id external company query sets the company."""
+    query, update = q.set_id_external_company_query(ID_USER, 90)
+    assert query == q.get_user_query(ID_USER)[0]
+    assert update == {"$set": {"id_external_company": 90}}
 
 
 def test_get_user_query_targets_the_internal_identifier():

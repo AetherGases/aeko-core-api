@@ -5,6 +5,7 @@ import importlib
 import pytest
 from langchain_core.tools import Tool
 
+from cmd.api.tools import constants as tool_constants
 from cmd.api.tools import mongo_tools
 from improvement_plan.entity import ImprovementPlan
 from session.entity import Message, Session
@@ -16,8 +17,6 @@ IMPROVEMENT_PLAN_TOOL_NAMES = {
     "get_improvement_plan_problem",
     "get_improvement_plan_method",
     "get_improvement_plan_reasoning",
-    "search_improvement_plans_by_problem",
-    "search_improvement_plans_by_method",
     "list_latest_improvement_plans",
 }
 
@@ -26,6 +25,28 @@ USER_MEMORY_TOOL_NAMES = {
     "list_user_memory_fields",
     "get_user_memory_by_field",
     "list_user_memories",
+}
+
+PLAN_TOOL_DESCRIPTIONS = {
+    "get_improvement_plan_by_inventory": "GET_IMPROVEMENT_PLAN_BY_INVENTORY_DESCRIPTION",
+    "get_improvement_plan_problem": "GET_IMPROVEMENT_PLAN_PROBLEM_DESCRIPTION",
+    "get_improvement_plan_method": "GET_IMPROVEMENT_PLAN_METHOD_DESCRIPTION",
+    "get_improvement_plan_reasoning": "GET_IMPROVEMENT_PLAN_REASONING_DESCRIPTION",
+    "list_latest_improvement_plans": "LIST_LATEST_IMPROVEMENT_PLANS_DESCRIPTION",
+}
+
+USER_MEMORY_TOOL_DESCRIPTIONS = {
+    "get_user_profile_by_external_id": "GET_USER_PROFILE_BY_EXTERNAL_ID_DESCRIPTION",
+    "list_user_memory_fields": "LIST_USER_MEMORY_FIELDS_DESCRIPTION",
+    "get_user_memory_by_field": "GET_USER_MEMORY_BY_FIELD_DESCRIPTION",
+    "list_user_memories": "LIST_USER_MEMORIES_DESCRIPTION",
+}
+
+SESSION_TOOL_DESCRIPTIONS = {
+    "list_user_session_names": "LIST_USER_SESSION_NAMES_DESCRIPTION",
+    "get_session_messages_by_name": "GET_SESSION_MESSAGES_BY_NAME_DESCRIPTION",
+    "get_latest_session_messages": "GET_LATEST_SESSION_MESSAGES_DESCRIPTION",
+    "count_user_sessions": "COUNT_USER_SESSIONS_DESCRIPTION",
 }
 
 SESSION_TOOL_NAMES = {
@@ -81,20 +102,6 @@ class StubPlanService:
         if self.plan is None:
             raise ValueError(f"Improvement plan with id_external_inventory {identifier} not found.")
         return self.plan
-
-    def search_by_defined_problem(self, problem_text):
-        """Record a problem search and return the scripted plans."""
-        self.calls.append(("search_by_defined_problem", problem_text))
-        if self.error is not None:
-            raise self.error
-        return list(self.plans)
-
-    def search_by_method(self, method_text):
-        """Record a method search and return the scripted plans."""
-        self.calls.append(("search_by_method", method_text))
-        if self.error is not None:
-            raise self.error
-        return list(self.plans)
 
     def list_latest(self, n):
         """Record a latest-plan listing and return the scripted plans."""
@@ -256,58 +263,10 @@ def test_get_improvement_plan_reasoning_returns_only_the_reasoning():
     ]
 
 
-def test_search_improvement_plans_by_problem_passes_the_text_to_the_service():
-    """Verify that search improvement plans by problem passes the text to the service."""
-    plans = StubPlanService(plans=[PLAN])
-    bind(plans=plans)
-
-    result = mongo_tools._search_improvement_plans_by_problem("flaring.")
-
-    assert result[0]["defined_problem"] == "flaring"
-    assert plans.calls == [("search_by_defined_problem", "flaring.")]
-
-
-def test_search_improvement_plans_by_method_passes_the_text_to_the_service():
-    """Verify that search improvement plans by method passes the text to the service."""
-    plans = StubPlanService(plans=[PLAN])
-    bind(plans=plans)
-
-    mongo_tools._search_improvement_plans_by_method("PDCA+")
-
-    assert plans.calls == [("search_by_method", "PDCA+")]
-
-
-@pytest.mark.parametrize("empty", [None, "", "   "])
-def test_search_improvement_plans_by_problem_rejects_empty_text(empty):
-    """Verify that search improvement plans by problem rejects empty text."""
-    plans = StubPlanService(plans=[PLAN])
-    bind(plans=plans)
-
-    with pytest.raises(ValueError):
-        mongo_tools._search_improvement_plans_by_problem(empty)
-
-    assert plans.calls == []
-
-
-def test_search_improvement_plans_caps_results_at_twenty():
-    """Verify that search improvement plans caps results at twenty."""
-    plans = [
-        ImprovementPlan(id=f"plan-{index}", id_external_inventory=index, defined_problem="flaring")
-        for index in range(25)
-    ]
-    bind(plans=StubPlanService(plans=plans))
-
-    result = mongo_tools._search_improvement_plans_by_problem("flaring")
-
-    assert len(result) == 20
-    assert all("_id" not in item and "id" not in item for item in result)
-
-
-def test_search_improvement_plans_returns_an_empty_list_when_nothing_matches():
-    """Verify that search improvement plans returns an empty list when nothing matches."""
-    bind(plans=StubPlanService(plans=[]))
-
-    assert mongo_tools._search_improvement_plans_by_problem("flaring") == []
+def test_mongo_tools_do_not_expose_regex_plan_search():
+    """Verify that mongo tools do not expose regex plan search."""
+    assert not hasattr(mongo_tools, "_search_improvement_plans_by_problem")
+    assert not hasattr(mongo_tools, "_search_improvement_plans_by_method")
 
 
 def test_list_latest_improvement_plans_asks_the_service_for_n_and_sorts_newest_first():
@@ -590,6 +549,13 @@ def test_get_improvement_plan_tools_exposes_the_typed_plan_catalog():
     assert all("filter" not in tool.args and "filter_json" not in tool.args for tool in tools)
 
 
+def test_improvement_plan_tools_load_descriptions_from_the_environment():
+    """Verify that improvement plan tools load descriptions from the environment."""
+    tools = {tool.name: tool for tool in mongo_tools.get_improvement_plan_tools()}
+    for name, constant in PLAN_TOOL_DESCRIPTIONS.items():
+        assert tools[name].description == getattr(tool_constants, constant)
+
+
 def test_get_improvement_plan_by_inventory_tool_declares_the_inventory_argument():
     """Verify that get improvement plan by inventory tool declares the inventory argument."""
     tool = next(
@@ -599,17 +565,6 @@ def test_get_improvement_plan_by_inventory_tool_declares_the_inventory_argument(
     )
 
     assert set(tool.args) == {"id_external_inventory"}
-
-
-def test_search_improvement_plans_by_problem_tool_declares_problem_text():
-    """Verify that search improvement plans by problem tool declares problem text."""
-    tool = next(
-        item
-        for item in mongo_tools.get_improvement_plan_tools()
-        if item.name == "search_improvement_plans_by_problem"
-    )
-
-    assert set(tool.args) == {"problem_text"}
 
 
 def test_list_latest_improvement_plans_tool_declares_n():
@@ -631,6 +586,13 @@ def test_get_user_memory_tools_exposes_the_typed_user_catalog():
     assert all("filter" not in tool.args and "filter_json" not in tool.args for tool in tools)
 
 
+def test_user_memory_tools_load_descriptions_from_the_environment():
+    """Verify that user memory tools load descriptions from the environment."""
+    tools = {tool.name: tool for tool in mongo_tools.get_user_memory_tools()}
+    for name, constant in USER_MEMORY_TOOL_DESCRIPTIONS.items():
+        assert tools[name].description == getattr(tool_constants, constant)
+
+
 def test_get_user_memory_by_field_tool_declares_external_user_and_field():
     """Verify that get user memory by field tool declares external user and field."""
     tool = next(
@@ -648,6 +610,13 @@ def test_get_session_tools_exposes_the_typed_session_catalog():
 
     assert {tool.name for tool in tools} == SESSION_TOOL_NAMES
     assert all("filter" not in tool.args and "filter_json" not in tool.args for tool in tools)
+
+
+def test_session_tools_load_descriptions_from_the_environment():
+    """Verify that session tools load descriptions from the environment."""
+    tools = {tool.name: tool for tool in mongo_tools.get_session_tools()}
+    for name, constant in SESSION_TOOL_DESCRIPTIONS.items():
+        assert tools[name].description == getattr(tool_constants, constant)
 
 
 def test_get_session_messages_by_name_tool_declares_external_user_and_session_name():

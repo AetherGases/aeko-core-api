@@ -180,7 +180,12 @@ def test_get_user_runs_through_the_concrete_repository():
     response = build_client(user_handlers.router, database).get("/aether-api/v1/ai/user/12345")
 
     assert response.status_code == 200
-    assert response.json() == {"id_external_user": 12345, "role": "analyst", "usecase": "report_generation"}
+    assert response.json() == {
+        "id_external_user": 12345,
+        "role": "analyst",
+        "usecase": "report_generation",
+        "id_external_company": None,
+    }
 
 
 def test_get_user_returns_404_when_the_document_does_not_exist():

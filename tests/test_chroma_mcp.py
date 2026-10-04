@@ -99,6 +99,14 @@ def fresh_mcp_session(monkeypatch):
     chroma_mcp.CHROMA_SESSION.close()
 
 
+@pytest.fixture(autouse=True)
+def reset_plan_services():
+    """Clear user and plan services bound for the agent wrapper."""
+    chroma_mcp.configure()
+    yield
+    chroma_mcp.configure()
+
+
 @pytest.fixture
 def cloud_env(monkeypatch):
     """Set Chroma Cloud credentials for the test."""
@@ -285,3 +293,189 @@ def test_get_gases_info_tools_entry_is_backed_by_query_gases_info(monkeypatch):
 
     assert tool.func("trocas possiveis para o SF6") == "gases info results"
     assert query_tool.calls[-1] == {"query_texts": ["trocas possiveis para o SF6"]}
+
+
+class StubUser:
+    """User row the wrapper reads for company scope."""
+
+    def __init__(self, id_external_company=90):
+        self.id = "u1"
+        self.id_external_user = 12345
+        self.id_external_company = id_external_company
+
+
+class StubUserService:
+    """Records external-user lookups and returns a scripted user."""
+
+    def __init__(self, user=None, error=None):
+        self.user = user or StubUser()
+        self.error = error
+        self.calls = []
+
+    def get_mongo_user(self, identifier):
+        """Return the scripted user or raise the scripted error."""
+        self.calls.append(("get_mongo_user", identifier))
+        if self.error is not None:
+            raise self.error
+        return self.user
+
+
+class StubPlan:
+    """Improvement plan the wrapper hydrates from Mongo."""
+
+    def __init__(self, company=90, inventory=502):
+        self.id = "p1"
+        self.id_external_inventory = inventory
+        self.id_external_company = company
+        self.defined_problem = "flaring"
+        self.method = "PDCA"
+        self.reasoning = "replace the flare"
+        self.updated_at = "2026-07-26T14:30:00Z"
+
+
+class StubPlanService:
+    """Records inventory lookups and returns a scripted plan."""
+
+    def __init__(self, plan=None, error=None):
+        self.plan = plan or StubPlan()
+        self.error = error
+        self.calls = []
+
+    def get_by_id_external_inventory(self, identifier):
+        """Return the scripted plan or raise the scripted error."""
+        self.calls.append(("get_by_id_external_inventory", identifier))
+        if self.error is not None:
+            raise self.error
+        return self.plan
+
+
+PLAN_QUERY_RESULT = {
+    "metadatas": [[{"id_external_inventory": 502, "id_external_company": 90}]],
+    "documents": [["flaring"]],
+}
+
+CATALOG_PLAN = {
+    "id_external_inventory": 502,
+    "defined_problem": "flaring",
+    "method": "PDCA",
+    "reasoning": "replace the flare",
+    "updated_at": "2026-07-26T14:30:00Z",
+}
+
+
+def bind_plan_query(monkeypatch, result=None, tool_name="query_improvement_plan_problems"):
+    """Point the Chroma session at one scripted MCP tool."""
+    tool = FakeMCPTool(tool_name, result=result if result is not None else PLAN_QUERY_RESULT)
+    monkeypatch.setattr(chroma_mcp, "_configure_mcp_client", lambda: FakeMCPClient([tool]))
+    return tool
+
+
+def test_query_improvement_plan_problems_injects_the_users_company_and_hides_where(monkeypatch):
+    """Verify that query improvement plan problems injects the users company and hides where."""
+    query_tool = bind_plan_query(monkeypatch)
+    chroma_mcp.configure(users=StubUserService(), improvement_plans=StubPlanService())
+
+    result = chroma_mcp._query_improvement_plan_problems(12345, "flaring")
+
+    assert query_tool.calls == [{"query_texts": ["flaring"], "id_external_company": 90}]
+    assert result == [CATALOG_PLAN]
+    assert "id_external_company" not in result[0]
+
+
+def test_query_improvement_plan_problems_never_lets_the_agent_name_a_collection():
+    """Verify that query improvement plan problems never lets the agent name a collection."""
+    tool = chroma_mcp.get_improvement_plan_problem_tools()[0]
+
+    assert set(tool.args) == {"id_external_user", "query"}
+
+
+def test_query_improvement_plan_problems_drops_a_plan_from_another_company(monkeypatch):
+    """Verify that query improvement plan problems drops a plan from another company."""
+    bind_plan_query(monkeypatch)
+    chroma_mcp.configure(
+        users=StubUserService(),
+        improvement_plans=StubPlanService(plan=StubPlan(company=91)),
+    )
+
+    assert chroma_mcp._query_improvement_plan_problems(12345, "flaring") == []
+
+
+def test_query_improvement_plan_problems_drops_a_missing_mongo_plan(monkeypatch):
+    """Verify that query improvement plan problems drops a missing mongo plan."""
+    bind_plan_query(monkeypatch)
+    chroma_mcp.configure(
+        users=StubUserService(),
+        improvement_plans=StubPlanService(error=ValueError("missing plan")),
+    )
+
+    assert chroma_mcp._query_improvement_plan_problems(12345, "flaring") == []
+
+
+def test_query_improvement_plan_problems_rejects_empty_query(monkeypatch):
+    """Verify that query improvement plan problems rejects empty query."""
+    query_tool = bind_plan_query(monkeypatch)
+    chroma_mcp.configure(users=StubUserService(), improvement_plans=StubPlanService())
+
+    with pytest.raises(ValueError):
+        chroma_mcp._query_improvement_plan_problems(12345, "   ")
+
+    assert query_tool.calls == []
+
+
+def test_query_improvement_plan_problems_rejects_an_unusable_user_id(monkeypatch):
+    """Verify that query improvement plan problems rejects an unusable user id."""
+    bind_plan_query(monkeypatch)
+    users = StubUserService()
+    chroma_mcp.configure(users=users, improvement_plans=StubPlanService())
+
+    for bad_id in (True, 0):
+        with pytest.raises(ValueError):
+            chroma_mcp._query_improvement_plan_problems(bad_id, "flaring")
+
+    assert users.calls == []
+
+
+def test_query_improvement_plan_problems_rejects_a_user_without_company(monkeypatch):
+    """Verify that query improvement plan problems rejects a user without company."""
+    query_tool = bind_plan_query(monkeypatch)
+    chroma_mcp.configure(
+        users=StubUserService(user=StubUser(id_external_company=None)),
+        improvement_plans=StubPlanService(),
+    )
+
+    with pytest.raises(ValueError, match="id_external_company"):
+        chroma_mcp._query_improvement_plan_problems(12345, "flaring")
+
+    assert query_tool.calls == []
+
+
+def test_query_improvement_plan_problems_raises_when_the_mcp_tool_is_missing(monkeypatch):
+    """Verify that query improvement plan problems raises when the mcp tool is missing."""
+    bind_plan_query(monkeypatch, tool_name="query_gases_info")
+    chroma_mcp.configure(users=StubUserService(), improvement_plans=StubPlanService())
+
+    with pytest.raises(LookupError, match="query_improvement_plan_problems"):
+        chroma_mcp._query_improvement_plan_problems(12345, "flaring")
+
+
+def test_upsert_improvement_plan_problem_calls_mcp(monkeypatch):
+    """Verify that upsert improvement plan problem calls mcp."""
+    upsert_tool = FakeMCPTool("upsert_improvement_plan_problem", result={"id": "502"})
+    monkeypatch.setattr(
+        chroma_mcp, "_configure_mcp_client", lambda: FakeMCPClient([upsert_tool])
+    )
+
+    chroma_mcp._upsert_improvement_plan_problem(502, "flaring", 90)
+
+    assert upsert_tool.calls == [{
+        "id_external_inventory": 502,
+        "defined_problem": "flaring",
+        "id_external_company": 90,
+    }]
+
+
+def test_get_improvement_plan_problem_tools_does_not_expose_upsert():
+    """Verify that get improvement plan problem tools does not expose upsert."""
+    names = {tool.name for tool in chroma_mcp.get_improvement_plan_problem_tools()}
+
+    assert names == {"query_improvement_plan_problems"}

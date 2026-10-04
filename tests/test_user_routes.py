@@ -54,7 +54,25 @@ def test_get_user_returns_profile():
         "id_external_user": 12345,
         "role": "analyst",
         "usecase": "report_generation",
+        "id_external_company": None,
     }
+
+
+def test_get_user_returns_id_external_company_when_set():
+    """Verify that get user returns id external company when set."""
+    service = StubUserService(
+        user=User(
+            id="65a8b3d6c0f8e1d7f4b2c010",
+            id_external_user=12345,
+            role="analyst",
+            usecase="report_generation",
+            id_external_company=90,
+        )
+    )
+    response = build_client(service).get(ROUTE.format(id_external_user=12345))
+
+    assert response.status_code == 200
+    assert response.json()["id_external_company"] == 90
 
 
 def test_get_user_forwards_the_path_parameter_as_int():

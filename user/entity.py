@@ -8,12 +8,14 @@ class User:
     id_external_user: int
     role: str
     usecase: str
+    id_external_company: int | None
 
-    def __init__(self, id: str, id_external_user: int, role: str, usecase: str):
+    def __init__(self, id: str, id_external_user: int, role: str, usecase: str, id_external_company: int | None = None):
         self.id = id
         self.id_external_user = id_external_user
         self.role = role
         self.usecase = usecase
+        self.id_external_company = id_external_company
 
 class UserMemory:
     id: str

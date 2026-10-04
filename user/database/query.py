@@ -18,6 +18,10 @@ def get_user_query(id_user: str) -> tuple[dict, dict]:
     """Build the filter and projection for an internal user identifier."""
     return id_filter("_id", id_user), {}
 
+def set_id_external_company_query(id_user: str, id_external_company: int) -> tuple[dict, dict]:
+    """Build the filter and $set document for a user's company identifier."""
+    return id_filter("_id", id_user), {"$set": {"id_external_company": id_external_company}}
+
 def get_user_memories_query(id_user: str) -> dict:
     """Build the filter for memories belonging to a user."""
     return id_filter("id_user", id_user)

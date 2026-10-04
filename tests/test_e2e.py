@@ -29,6 +29,7 @@ REPORT_BODY = {
     "id_external_context_inventory": ID_INVENTORY,
     "inventory": INVENTORY_MARKDOWN,
     "id_external_user": ID_EXTERNAL_USER,
+    "id_external_company": 90,
     "gases": [{"id": 1, "name": "CO2"}],
     "scopes": [{"id": 1, "name": "Escopo 1"}],
     "categories": [{"id": 1, "name": "Combustão estacionária", "classification": None}],
@@ -85,6 +86,13 @@ class InMemoryUserRepository:
     def create_user_memory(self, user_memory):
         """Persist a memory associated with a user."""
         self.memories.append(user_memory)
+
+    def set_id_external_company(self, id_user, id_external_company):
+        """Persist the company identifier on the user."""
+        user = self.get_user_by_id(id_user)
+        if user is None:
+            raise ValueError(f"User with id {id_user} not found.")
+        user.id_external_company = id_external_company
 
 
 class InMemorySessionRepository:
@@ -277,9 +285,8 @@ IMPROVEMENT_PLAN_TOOL_NAMES = {
     "get_improvement_plan_problem",
     "get_improvement_plan_method",
     "get_improvement_plan_reasoning",
-    "search_improvement_plans_by_problem",
-    "search_improvement_plans_by_method",
     "list_latest_improvement_plans",
+    "query_improvement_plan_problems",
 }
 
 USER_MEMORY_TOOL_NAMES = {
@@ -306,6 +313,12 @@ def test_faq_gets_the_site_map_and_user_memory_tools(live_app, fake_sdk):
         "tavily_research",
         CALCULATOR_TOOL_NAME,
     } | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES
+
+
+def test_faq_does_not_get_plan_problem_search(live_app, fake_sdk):
+    """Verify that faq does not get plan problem search."""
+    tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools["FAQ"]}
+    assert "query_improvement_plan_problems" not in tool_names
 
 
 ROI_TOOL_NAMES = {"calculate_roi", "calculate_payback"}
@@ -381,6 +394,13 @@ def test_inventory_analyst_gets_no_tavily_tools_but_gets_mongo_tools(live_app, f
     """Verify that inventory analyst gets no tavily tools but gets mongo tools."""
     tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools["Análista de inventários"]}
     assert tool_names == {CALCULATOR_TOOL_NAME} | IMPROVEMENT_PLAN_TOOL_NAMES | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES
+
+
+def test_inventory_analyst_gets_chroma_plan_search(live_app, fake_sdk):
+    """Verify that inventory analyst gets chroma plan search."""
+    tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools["Análista de inventários"]}
+    assert "query_improvement_plan_problems" in tool_names
+    assert "search_improvement_plans_by_problem" not in tool_names
 
 
 @pytest.mark.parametrize("agent", sorted(TOOLED_AGENTS))

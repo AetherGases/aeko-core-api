@@ -41,6 +41,11 @@ def request_with(db):
     return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(db=db)))
 
 
+def test_mcp_sessions_are_tavily_and_chroma(api_main):
+    """Verify that mcp sessions are tavily and chroma."""
+    assert [session.name for session in api_main.MCP_SESSIONS] == ["tavily", "chroma"]
+
+
 def test_report_route_is_registered_on_the_application(api_main):
     """Verify that report route is registered on the application."""
     paths = api_main.app.openapi()["paths"]

@@ -92,6 +92,21 @@ class StubPlanRepository:
         self.existing = improvement_plan
         return improvement_plan
 
+    def search_by_defined_problem(self, problem_text):
+        """Retrieve plans whose defined problem matches the supplied text."""
+        self.calls.append(("search_problem", problem_text))
+        return self.result if self.result is not None else []
+
+    def search_by_method(self, method_text):
+        """Retrieve plans whose method matches the supplied text."""
+        self.calls.append(("search_method", method_text))
+        return self.result if self.result is not None else []
+
+    def list_latest(self, n):
+        """Retrieve the n most recently updated improvement plans."""
+        self.calls.append(("list_latest", n))
+        return self.result if self.result is not None else []
+
 
 class StubPlan:
     """Stands in for the `AekoImprovementPlan` the SDK returns."""
@@ -394,6 +409,74 @@ def test_replace_wraps_database_failures():
         repository.replace(ImprovementPlan(id_external_inventory=1))
 
 
+def test_search_by_defined_problem_uses_the_escaped_regex_query():
+    """Verify that search by defined problem uses the escaped regex query."""
+    repository, collection = build_repository(StubCollection(find_result=[PLAN_DOCUMENT]))
+
+    plans = repository.search_by_defined_problem("flaring.")
+
+    query, projection = collection.call_args("find")[0]
+    assert query == {"defined_problem": {"$regex": r"flaring\.", "$options": "i"}}
+    assert projection["defined_problem"] == 1
+    assert collection.find_options[0]["limit"] == 20
+    assert plans[0].defined_problem == "high scope 1 emissions"
+
+
+def test_search_by_method_uses_the_escaped_regex_query():
+    """Verify that search by method uses the escaped regex query."""
+    repository, collection = build_repository(StubCollection(find_result=[PLAN_DOCUMENT]))
+
+    repository.search_by_method("PDCA+")
+
+    query, _ = collection.call_args("find")[0]
+    assert query == {"method": {"$regex": r"PDCA\+", "$options": "i"}}
+    assert collection.find_options[0]["limit"] == 20
+
+
+def test_search_by_defined_problem_returns_an_empty_list():
+    """Verify that search by defined problem returns an empty list."""
+    repository, _ = build_repository(StubCollection(find_result=[]))
+
+    assert repository.search_by_defined_problem("flaring") == []
+
+
+def test_list_latest_sorts_and_limits_in_the_find():
+    """Verify that list latest sorts and limits in the find."""
+    repository, collection = build_repository(StubCollection(find_result=[PLAN_DOCUMENT]))
+
+    plans = repository.list_latest(3)
+
+    query, projection = collection.call_args("find")[0]
+    assert query == {}
+    assert projection["_id"] == 0
+    assert collection.find_options[0]["sort"] == [("updated_at", -1)]
+    assert collection.find_options[0]["limit"] == 3
+    assert plans[0].id == "65a8b3d6c0f8e1d7f4b2c020"
+
+
+def test_list_latest_returns_an_empty_list():
+    """Verify that list latest returns an empty list."""
+    repository, _ = build_repository(StubCollection(find_result=[]))
+
+    assert repository.list_latest(3) == []
+
+
+def test_search_by_defined_problem_wraps_database_failures():
+    """Verify that search by defined problem wraps database failures."""
+    repository, _ = build_repository(StubCollection(error=OSError("boom")))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        repository.search_by_defined_problem("flaring")
+
+
+def test_list_latest_wraps_database_failures():
+    """Verify that list latest wraps database failures."""
+    repository, _ = build_repository(StubCollection(error=OSError("boom")))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        repository.list_latest(3)
+
+
 def test_improvement_plan_from_data_handles_a_document_without_an_identifier():
     """Verify that improvement plan from data handles a document without an identifier."""
     plan = improvement_plan_from_data({"id_external_inventory": 2})
@@ -406,6 +489,61 @@ def test_improvement_plan_from_data_handles_a_document_without_an_identifier():
 def test_get_by_id_external_inventory_query():
     """Verify that get by id external inventory query."""
     assert q.get_by_id_external_inventory_query(7) == ({"id_external_inventory": 7}, {})
+
+
+def test_get_improvement_plan_problem_query_projects_only_the_problem():
+    """Verify that get improvement plan problem query projects only the problem."""
+    query, projection = q.get_improvement_plan_problem_query(7)
+
+    assert query == {"id_external_inventory": 7}
+    assert projection == {"_id": 0, "id_external_inventory": 1, "defined_problem": 1}
+
+
+def test_get_improvement_plan_method_query_projects_only_the_method():
+    """Verify that get improvement plan method query projects only the method."""
+    query, projection = q.get_improvement_plan_method_query(7)
+
+    assert query == {"id_external_inventory": 7}
+    assert projection == {"_id": 0, "id_external_inventory": 1, "method": 1}
+
+
+def test_get_improvement_plan_reasoning_query_projects_only_the_reasoning():
+    """Verify that get improvement plan reasoning query projects only the reasoning."""
+    query, projection = q.get_improvement_plan_reasoning_query(7)
+
+    assert query == {"id_external_inventory": 7}
+    assert projection == {"_id": 0, "id_external_inventory": 1, "reasoning": 1}
+
+
+def test_get_by_defined_problem_query_escapes_regex_metacharacters():
+    """Verify that get by defined problem query escapes regex metacharacters."""
+    query, projection = q.get_by_defined_problem_query("flaring.")
+
+    assert query == {"defined_problem": {"$regex": r"flaring\.", "$options": "i"}}
+    assert projection["_id"] == 0
+    assert projection["defined_problem"] == 1
+
+
+def test_get_by_method_query_escapes_regex_metacharacters():
+    """Verify that get by method query escapes regex metacharacters."""
+    query, _ = q.get_by_method_query("PDCA+")
+
+    assert query == {"method": {"$regex": r"PDCA\+", "$options": "i"}}
+
+
+def test_get_latest_improvement_plans_query_lists_catalog_fields_without_id():
+    """Verify that get latest improvement plans query lists catalog fields without id."""
+    query, projection = q.get_latest_improvement_plans_query()
+
+    assert query == {}
+    assert projection == {
+        "_id": 0,
+        "id_external_inventory": 1,
+        "defined_problem": 1,
+        "method": 1,
+        "reasoning": 1,
+        "updated_at": 1,
+    }
 
 
 def test_create_improvement_plan_query_maps_every_field_the_flow_persists():
@@ -478,6 +616,33 @@ def test_service_replace_delegates_to_the_repository():
 
     assert build_service(repository).replace(plan) is plan
     assert repository.calls == [("replace", plan)]
+
+
+def test_service_search_by_defined_problem_delegates_to_the_repository():
+    """Verify that service search by defined problem delegates to the repository."""
+    plans = [ImprovementPlan(id="p1")]
+    repository = StubPlanRepository(result=plans)
+
+    assert build_service(repository).search_by_defined_problem("flaring") is plans
+    assert repository.calls == [("search_problem", "flaring")]
+
+
+def test_service_search_by_method_delegates_to_the_repository():
+    """Verify that service search by method delegates to the repository."""
+    plans = [ImprovementPlan(id="p1")]
+    repository = StubPlanRepository(result=plans)
+
+    assert build_service(repository).search_by_method("PDCA") is plans
+    assert repository.calls == [("search_method", "PDCA")]
+
+
+def test_service_list_latest_delegates_to_the_repository():
+    """Verify that service list latest delegates to the repository."""
+    plans = [ImprovementPlan(id="p1")]
+    repository = StubPlanRepository(result=plans)
+
+    assert build_service(repository).list_latest(3) is plans
+    assert repository.calls == [("list_latest", 3)]
 
 
 def test_analyze_receives_the_inventory_as_markdown():

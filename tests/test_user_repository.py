@@ -243,6 +243,39 @@ def test_get_user_memories_query_targets_the_user():
     assert {"id_user": ObjectId(ID_USER)} in query["$or"]
 
 
+def test_get_user_profile_query_projects_role_and_usecase():
+    """Verify that get user profile query projects role and usecase."""
+    query, projection = q.get_user_profile_query(12345)
+
+    assert query == {"id_external_user": 12345}
+    assert projection == {"_id": 0, "id_external_user": 1, "role": 1, "usecase": 1}
+
+
+def test_get_user_memory_fields_query_projects_only_field_names():
+    """Verify that get user memory fields query projects only field names."""
+    query, projection = q.get_user_memory_fields_query(ID_USER)
+
+    assert {"id_user": ID_USER} in query["$or"]
+    assert projection == {"_id": 0, "field": 1}
+
+
+def test_get_user_memory_by_field_query_requires_the_owner_and_field():
+    """Verify that get user memory by field query requires the owner and field."""
+    query, projection = q.get_user_memory_by_field_query(ID_USER, "preferred_language")
+
+    assert {"id_user": ID_USER} in query["$and"][0]["$or"]
+    assert {"field": "preferred_language"} in query["$and"]
+    assert projection == {"_id": 0, "field": 1, "description": 1}
+
+
+def test_get_user_memories_content_query_projects_field_and_description():
+    """Verify that get user memories content query projects field and description."""
+    query, projection = q.get_user_memories_content_query(ID_USER)
+
+    assert {"id_user": ID_USER} in query["$or"]
+    assert projection == {"_id": 0, "field": 1, "description": 1}
+
+
 def test_create_user_memory_query_stores_the_owner_as_an_object_id():
     """Verify that create user memory query stores the owner as an object id."""
     document = q.create_user_memory_query(UserMemory(id=None, id_user=ID_USER, field="f", description="d"))

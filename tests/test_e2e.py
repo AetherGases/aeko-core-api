@@ -272,6 +272,30 @@ def test_lifespan_registers_every_agent_in_a_single_call(live_app, fake_sdk):
 
 CALCULATOR_TOOL_NAME = "calculator"
 
+IMPROVEMENT_PLAN_TOOL_NAMES = {
+    "get_improvement_plan_by_inventory",
+    "get_improvement_plan_problem",
+    "get_improvement_plan_method",
+    "get_improvement_plan_reasoning",
+    "search_improvement_plans_by_problem",
+    "search_improvement_plans_by_method",
+    "list_latest_improvement_plans",
+}
+
+USER_MEMORY_TOOL_NAMES = {
+    "get_user_profile_by_external_id",
+    "list_user_memory_fields",
+    "get_user_memory_by_field",
+    "list_user_memories",
+}
+
+SESSION_TOOL_NAMES = {
+    "list_user_session_names",
+    "get_session_messages_by_name",
+    "get_latest_session_messages",
+    "count_user_sessions",
+}
+
 
 def test_faq_gets_the_site_map_and_user_memory_tools(live_app, fake_sdk):
     """Verify that faq gets the site map and user memory tools."""
@@ -280,9 +304,8 @@ def test_faq_gets_the_site_map_and_user_memory_tools(live_app, fake_sdk):
         "tavily_map",
         "tavily_search",
         "tavily_research",
-        "find_user_memory",
         CALCULATOR_TOOL_NAME,
-    }
+    } | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES
 
 
 ROI_TOOL_NAMES = {"calculate_roi", "calculate_payback"}
@@ -296,10 +319,8 @@ def test_continuous_improvement_coordinator_also_gets_the_roi_tools(live_app, fa
     assert tool_names == {
         "tavily_search",
         "tavily_research",
-        "find_improvement_plan",
-        "find_user_memory",
         CALCULATOR_TOOL_NAME,
-    } | ROI_TOOL_NAMES
+    } | IMPROVEMENT_PLAN_TOOL_NAMES | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES | ROI_TOOL_NAMES
 
 
 @pytest.mark.parametrize(
@@ -318,11 +339,9 @@ def test_green_gas_analyst_also_gets_the_chroma_vector_search(live_app, fake_sdk
     assert tool_names == {
         "tavily_search",
         "tavily_research",
-        "find_improvement_plan",
-        "find_user_memory",
         "query_gases_info",
         CALCULATOR_TOOL_NAME,
-    }
+    } | IMPROVEMENT_PLAN_TOOL_NAMES | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES
 
 
 @pytest.mark.parametrize(
@@ -344,10 +363,8 @@ def test_pollutant_analyst_also_gets_the_climatiq_calculator(live_app, fake_sdk)
     assert tool_names == {
         "tavily_search",
         "tavily_research",
-        "find_improvement_plan",
-        "find_user_memory",
         CALCULATOR_TOOL_NAME,
-    } | CLIMATIQ_TOOL_NAMES
+    } | IMPROVEMENT_PLAN_TOOL_NAMES | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES | CLIMATIQ_TOOL_NAMES
 
 
 @pytest.mark.parametrize(
@@ -363,7 +380,14 @@ def test_no_other_agent_can_reach_climatiq(live_app, fake_sdk, agent):
 def test_inventory_analyst_gets_no_tavily_tools_but_gets_mongo_tools(live_app, fake_sdk):
     """Verify that inventory analyst gets no tavily tools but gets mongo tools."""
     tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools["Análista de inventários"]}
-    assert tool_names == {"find_improvement_plan", "find_user_memory", CALCULATOR_TOOL_NAME}
+    assert tool_names == {CALCULATOR_TOOL_NAME} | IMPROVEMENT_PLAN_TOOL_NAMES | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES
+
+
+@pytest.mark.parametrize("agent", sorted(TOOLED_AGENTS))
+def test_no_agent_gets_raw_mongo_find_tools(live_app, fake_sdk, agent):
+    """Verify that no agent gets raw mongo find tools."""
+    tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools[agent]}
+    assert tool_names.isdisjoint({"find_improvement_plan", "find_user_memory"})
 
 
 @pytest.mark.parametrize("agent", sorted(TOOLED_AGENTS))
@@ -471,7 +495,7 @@ def printed_within(capsys, needle, timeout=5.0):
 
 def test_lifespan_warms_up_every_mcp_session_and_closes_it_afterwards(api_main, monkeypatch):
     """Verify that lifespan warms up every mcp session and closes it afterwards."""
-    sessions = (FakeMCPSession("tavily"), FakeMCPSession("mongodb"), FakeMCPSession("chroma"))
+    sessions = (FakeMCPSession("tavily"), FakeMCPSession("chroma"))
     monkeypatch.setattr(api_main, "MCP_SESSIONS", sessions)
     monkeypatch.setattr(api_main, "MCP_WARM_UP", "true")
 
@@ -479,7 +503,7 @@ def test_lifespan_warms_up_every_mcp_session_and_closes_it_afterwards(api_main, 
         for session in sessions:
             assert session.started.wait(timeout=5), f"{session.name} was never started"
 
-    assert [session.closed for session in sessions] == [True, True, True]
+    assert [session.closed for session in sessions] == [True, True]
 
 
 def test_lifespan_spawns_no_mcp_server_when_warm_up_is_switched_off(api_main, monkeypatch):

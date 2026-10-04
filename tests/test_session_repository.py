@@ -394,6 +394,25 @@ def test_get_user_sessions_query_projects_the_session_fields():
     assert projection["id_user"] == 1
 
 
+def test_get_user_session_names_query_projects_only_the_name():
+    """Verify that get user session names query projects only the name."""
+    query, projection = q.get_user_session_names_query(ID_USER)
+
+    assert {"id_user": ID_USER} in query["$or"]
+    assert projection == {"_id": 0, "name": 1}
+
+
+def test_get_session_by_name_query_requires_the_owner_and_name():
+    """Verify that get session by name query requires the owner and name."""
+    query, projection = q.get_session_by_name_query(ID_USER, "Weekly emissions review")
+
+    assert {"id_user": ID_USER} in query["$and"][0]["$or"]
+    assert {"name": "Weekly emissions review"} in query["$and"]
+    assert projection["messages.input"] == 1
+    assert projection["messages.output"] == 1
+    assert projection["messages.submitted_at"] == 1
+
+
 def test_get_session_query_projects_the_session_fields():
     """Verify that get session query projects the session fields."""
     query, projection = q.get_session_query(ID_SESSION)

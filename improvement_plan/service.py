@@ -26,6 +26,18 @@ class Service(IService):
         """Replace the plan stored for the same external inventory identifier."""
         return self.repository.replace(improvement_plan)
 
+    def search_by_defined_problem(self, problem_text: str) -> list[ImprovementPlan]:
+        """Retrieve plans whose defined problem matches the supplied text."""
+        return self.repository.search_by_defined_problem(problem_text)
+
+    def search_by_method(self, method_text: str) -> list[ImprovementPlan]:
+        """Retrieve plans whose method matches the supplied text."""
+        return self.repository.search_by_method(method_text)
+
+    def list_latest(self, n: int) -> list[ImprovementPlan]:
+        """Retrieve the n most recently updated improvement plans."""
+        return self.repository.list_latest(n)
+
     def input_inventory(
         self,
         id_external_inventory: int | None,

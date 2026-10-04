@@ -45,6 +45,41 @@ class Repository(IRepository):
         except Exception as e:
             raise RuntimeError(f"Error replacing improvement plan in database: {e}")
 
+    @logged(Module.DATABASE, "improvement_plan.search_by_defined_problem")
+    def search_by_defined_problem(self, problem_text: str) -> list[ImprovementPlan]:
+        """Retrieve plans whose defined problem matches the supplied text."""
+        try:
+            query, projection = q.get_by_defined_problem_query(problem_text)
+            documents = self.db["improvement_plan"].find(query, projection, limit=20)
+            return [improvement_plan_from_data(data) for data in documents]
+        except Exception as e:
+            raise RuntimeError(f"Error searching improvement plans by problem: {e}")
+
+    @logged(Module.DATABASE, "improvement_plan.search_by_method")
+    def search_by_method(self, method_text: str) -> list[ImprovementPlan]:
+        """Retrieve plans whose method matches the supplied text."""
+        try:
+            query, projection = q.get_by_method_query(method_text)
+            documents = self.db["improvement_plan"].find(query, projection, limit=20)
+            return [improvement_plan_from_data(data) for data in documents]
+        except Exception as e:
+            raise RuntimeError(f"Error searching improvement plans by method: {e}")
+
+    @logged(Module.DATABASE, "improvement_plan.list_latest")
+    def list_latest(self, n: int) -> list[ImprovementPlan]:
+        """Retrieve the n most recently updated improvement plans."""
+        try:
+            query, projection = q.get_latest_improvement_plans_query()
+            documents = self.db["improvement_plan"].find(
+                query,
+                projection,
+                sort=[("updated_at", -1)],
+                limit=n,
+            )
+            return [improvement_plan_from_data(data) for data in documents]
+        except Exception as e:
+            raise RuntimeError(f"Error listing latest improvement plans: {e}")
+
 
 def improvement_plan_from_data(data: dict) -> ImprovementPlan:
     """Map a MongoDB document to an improvement plan entity."""

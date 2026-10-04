@@ -23,6 +23,7 @@ from cmd.api.tools.constants import (
     GET_SESSION_MESSAGES_BY_NAME_DESCRIPTION,
     GET_LATEST_SESSION_MESSAGES_DESCRIPTION,
     COUNT_USER_SESSIONS_DESCRIPTION,
+    LIST_LATEST_USER_SESSION_NAMES_DESCRIPTION,
 )
 
 from improvement_plan.entity import ImprovementPlan
@@ -290,6 +291,21 @@ def _list_user_session_names(id_external_user: int) -> list[dict[str, Any]]:
     return [{"name": session.name} for session in _user_sessions(user)]
 
 
+@logged(Module.TOOL, "list_latest_user_session_names")
+def _list_latest_user_session_names(id_external_user: int, n: int) -> list[dict[str, Any]]:
+    """Return the n most recently updated session names for an external user."""
+
+    identifier = _positive_int(id_external_user, "id_external_user")
+    limit = _positive_int(n, "n")
+    user = _require_user(identifier)
+    ordered = sorted(
+        _user_sessions(user),
+        key=lambda session: _timestamp(session.updated_at) or "",
+        reverse=True,
+    )
+    return [{"name": session.name} for session in ordered[:limit]]
+
+
 @logged(Module.TOOL, "get_session_messages_by_name")
 def _get_session_messages_by_name(
     id_external_user: int,
@@ -413,6 +429,11 @@ def get_session_tools() -> list[Tool]:
             "list_user_session_names",
             LIST_USER_SESSION_NAMES_DESCRIPTION,
             _list_user_session_names,
+        ),
+        _typed_tool(
+            "list_latest_user_session_names",
+            LIST_LATEST_USER_SESSION_NAMES_DESCRIPTION,
+            _list_latest_user_session_names,
         ),
         _typed_tool(
             "get_session_messages_by_name",

@@ -298,6 +298,7 @@ USER_MEMORY_TOOL_NAMES = {
 
 SESSION_TOOL_NAMES = {
     "list_user_session_names",
+    "list_latest_user_session_names",
     "get_session_messages_by_name",
     "get_latest_session_messages",
     "count_user_sessions",

@@ -44,6 +44,7 @@ USER_MEMORY_TOOL_DESCRIPTIONS = {
 
 SESSION_TOOL_DESCRIPTIONS = {
     "list_user_session_names": "LIST_USER_SESSION_NAMES_DESCRIPTION",
+    "list_latest_user_session_names": "LIST_LATEST_USER_SESSION_NAMES_DESCRIPTION",
     "get_session_messages_by_name": "GET_SESSION_MESSAGES_BY_NAME_DESCRIPTION",
     "get_latest_session_messages": "GET_LATEST_SESSION_MESSAGES_DESCRIPTION",
     "count_user_sessions": "COUNT_USER_SESSIONS_DESCRIPTION",
@@ -51,6 +52,7 @@ SESSION_TOOL_DESCRIPTIONS = {
 
 SESSION_TOOL_NAMES = {
     "list_user_session_names",
+    "list_latest_user_session_names",
     "get_session_messages_by_name",
     "get_latest_session_messages",
     "count_user_sessions",
@@ -430,6 +432,98 @@ def test_list_user_session_names_returns_an_empty_list_when_the_user_has_none():
     assert mongo_tools._list_user_session_names(12345) == []
 
 
+def test_list_latest_user_session_names_returns_the_newest_n_names():
+    """Verify that list latest user session names returns the newest n names."""
+    older = Session(
+        id="s-old",
+        id_user=USER_ID,
+        name="older chat",
+        messages=[],
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    newer = Session(
+        id="s-new",
+        id_user=USER_ID,
+        name="newer chat",
+        messages=[],
+        updated_at="2026-09-01T00:00:00Z",
+    )
+    middle = Session(
+        id="s-mid",
+        id_user=USER_ID,
+        name="middle chat",
+        messages=[],
+        updated_at="2026-06-01T00:00:00Z",
+    )
+    bind(
+        users=StubUserService(user=USER),
+        sessions=StubSessionService(sessions=[older, newer, middle]),
+    )
+
+    result = mongo_tools._list_latest_user_session_names(12345, 2)
+
+    assert result == [{"name": "newer chat"}, {"name": "middle chat"}]
+
+
+def test_list_latest_user_session_names_puts_sessions_without_updated_at_last():
+    """Verify that list latest user session names puts sessions without updated at last."""
+    stamped = Session(
+        id="s-new",
+        id_user=USER_ID,
+        name="stamped",
+        messages=[],
+        updated_at="2026-09-01T00:00:00Z",
+    )
+    missing = Session(id="s-old", id_user=USER_ID, name="unstamped", messages=[])
+    bind(
+        users=StubUserService(user=USER),
+        sessions=StubSessionService(sessions=[missing, stamped]),
+    )
+
+    result = mongo_tools._list_latest_user_session_names(12345, 2)
+
+    assert result == [{"name": "stamped"}, {"name": "unstamped"}]
+
+
+def test_list_latest_user_session_names_returns_fewer_when_the_user_has_fewer():
+    """Verify that list latest user session names returns fewer when the user has fewer."""
+    bind(users=StubUserService(user=USER), sessions=StubSessionService(sessions=[SESSION]))
+
+    result = mongo_tools._list_latest_user_session_names(12345, 5)
+
+    assert result == [{"name": "Weekly emissions review"}]
+
+
+def test_list_latest_user_session_names_returns_an_empty_list_when_the_user_has_none():
+    """Verify that list latest user session names returns an empty list when the user has none."""
+    bind(users=StubUserService(user=USER), sessions=StubSessionService(empty=True))
+
+    assert mongo_tools._list_latest_user_session_names(12345, 3) == []
+
+
+def test_list_latest_user_session_names_accepts_a_numeric_string():
+    """Verify that list latest user session names accepts a numeric string."""
+    bind(users=StubUserService(user=USER), sessions=StubSessionService(sessions=[SESSION]))
+
+    result = mongo_tools._list_latest_user_session_names("12345", "1")
+
+    assert result == [{"name": "Weekly emissions review"}]
+
+
+@pytest.mark.parametrize("bad", [None, "", "   ", "abc", 0, -1, True, False, 4.2])
+def test_list_latest_user_session_names_rejects_an_unusable_limit(bad):
+    """Verify that list latest user session names rejects an unusable limit."""
+    users = StubUserService(user=USER)
+    sessions = StubSessionService(sessions=[SESSION])
+    bind(users=users, sessions=sessions)
+
+    with pytest.raises(ValueError):
+        mongo_tools._list_latest_user_session_names(12345, bad)
+
+    assert users.calls == []
+    assert sessions.calls == []
+
+
 def test_get_session_messages_by_name_reads_messages_from_the_named_session():
     """Verify that get session messages by name reads messages from the named session."""
     sessions = StubSessionService(sessions=[SESSION], messages=[MESSAGE])
@@ -617,6 +711,17 @@ def test_session_tools_load_descriptions_from_the_environment():
     tools = {tool.name: tool for tool in mongo_tools.get_session_tools()}
     for name, constant in SESSION_TOOL_DESCRIPTIONS.items():
         assert tools[name].description == getattr(tool_constants, constant)
+
+
+def test_list_latest_user_session_names_tool_declares_external_user_and_n():
+    """Verify that list latest user session names tool declares external user and n."""
+    tool = next(
+        item
+        for item in mongo_tools.get_session_tools()
+        if item.name == "list_latest_user_session_names"
+    )
+
+    assert set(tool.args) == {"id_external_user", "n"}
 
 
 def test_get_session_messages_by_name_tool_declares_external_user_and_session_name():

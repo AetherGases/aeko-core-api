@@ -62,11 +62,21 @@ class Repository(IRepository):
         except Exception as e:
             raise RuntimeError(f"Error creating user memory in database: {e}")
 
+    @logged(Module.DATABASE, "user.set_id_external_company")
+    def set_id_external_company(self, id_user: str, id_external_company: int) -> None:
+        """Persist the company identifier on the user document."""
+        try:
+            query, update = q.set_id_external_company_query(id_user, id_external_company)
+            self.db.user.update_one(query, update)
+        except Exception as e:
+            raise RuntimeError(f"Error updating user company: {e}")
+
 def user_from_data(data: dict) -> User:
     """Map a MongoDB document to a user entity."""
     return User(
         id=str(data["_id"]),
         id_external_user=data["id_external_user"],
         role=data["role"],
-        usecase=data["usecase"]
+        usecase=data["usecase"],
+        id_external_company=data.get("id_external_company")
     )

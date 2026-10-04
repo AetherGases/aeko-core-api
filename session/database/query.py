@@ -24,6 +24,26 @@ def get_user_sessions_query(id_user: str) -> tuple[dict, dict]:
     """Build the filter and projection for a user's sessions."""
     return id_filter("id_user", id_user), SESSION_PROJECTION
 
+def get_user_session_names_query(id_user: str) -> tuple[dict, dict]:
+    """Build the filter and projection for a user's session names."""
+    query, _ = get_user_sessions_query(id_user)
+    return query, {"_id": 0, "name": 1}
+
+def get_session_by_name_query(id_user: str, name: str) -> tuple[dict, dict]:
+    """Build the filter and projection for one session identified by owner and name."""
+    return {
+        "name": name,
+        "$and": [
+            id_filter("id_user", id_user),
+            {"name": name},
+        ],
+    }, {
+        "_id": 0,
+        "messages.input": 1,
+        "messages.output": 1,
+        "messages.submitted_at": 1,
+    }
+
 def get_sessions_updated_since_query(since: datetime) -> tuple[dict, dict]:
     """Build the filter and projection for sessions touched after the supplied time."""
     return {"updated_at": {"$gte": since}}, SESSION_PROJECTION

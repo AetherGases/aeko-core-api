@@ -75,6 +75,27 @@ def test_get_user_returns_the_user_entity():
     )
 
 
+def test_get_user_maps_id_external_company():
+    """Verify that get user maps id external company."""
+    repository, _ = build_repository(
+        user=StubCollection(find_one_result={**USER_DOCUMENT, "id_external_company": 90})
+    )
+
+    assert repository.get_user(12345).id_external_company == 90
+
+
+def test_set_id_external_company_updates_the_user_document():
+    """Verify that set id external company updates the user document."""
+    collection = StubCollection(find_one_result=USER_DOCUMENT)
+    repository, _ = build_repository(user=collection)
+
+    repository.set_id_external_company(ID_USER, 90)
+
+    query, update = collection.call_args("update_one")[0]
+    assert query == q.get_user_query(ID_USER)[0]
+    assert update == {"$set": {"id_external_company": 90}}
+
+
 def test_get_user_queries_by_the_external_identifier():
     """Verify that get user queries by the external identifier."""
     collection = StubCollection(find_one_result=USER_DOCUMENT)
@@ -219,6 +240,13 @@ def test_get_user_query_filter_keeps_the_external_identifier_a_number():
     assert isinstance(q.get_user_query_filter(12345)["id_external_user"], int)
 
 
+def test_set_id_external_company_query_sets_the_company():
+    """Verify that set id external company query sets the company."""
+    query, update = q.set_id_external_company_query(ID_USER, 90)
+    assert query == q.get_user_query(ID_USER)[0]
+    assert update == {"$set": {"id_external_company": 90}}
+
+
 def test_get_user_query_targets_the_internal_identifier():
     """Verify that get user query targets the internal identifier."""
     query, projection = q.get_user_query(ID_USER)
@@ -241,6 +269,39 @@ def test_get_user_memories_query_targets_the_user():
 
     assert {"id_user": ID_USER} in query["$or"]
     assert {"id_user": ObjectId(ID_USER)} in query["$or"]
+
+
+def test_get_user_profile_query_projects_role_and_usecase():
+    """Verify that get user profile query projects role and usecase."""
+    query, projection = q.get_user_profile_query(12345)
+
+    assert query == {"id_external_user": 12345}
+    assert projection == {"_id": 0, "id_external_user": 1, "role": 1, "usecase": 1}
+
+
+def test_get_user_memory_fields_query_projects_only_field_names():
+    """Verify that get user memory fields query projects only field names."""
+    query, projection = q.get_user_memory_fields_query(ID_USER)
+
+    assert {"id_user": ID_USER} in query["$or"]
+    assert projection == {"_id": 0, "field": 1}
+
+
+def test_get_user_memory_by_field_query_requires_the_owner_and_field():
+    """Verify that get user memory by field query requires the owner and field."""
+    query, projection = q.get_user_memory_by_field_query(ID_USER, "preferred_language")
+
+    assert {"id_user": ID_USER} in query["$and"][0]["$or"]
+    assert {"field": "preferred_language"} in query["$and"]
+    assert projection == {"_id": 0, "field": 1, "description": 1}
+
+
+def test_get_user_memories_content_query_projects_field_and_description():
+    """Verify that get user memories content query projects field and description."""
+    query, projection = q.get_user_memories_content_query(ID_USER)
+
+    assert {"id_user": ID_USER} in query["$or"]
+    assert projection == {"_id": 0, "field": 1, "description": 1}
 
 
 def test_create_user_memory_query_stores_the_owner_as_an_object_id():

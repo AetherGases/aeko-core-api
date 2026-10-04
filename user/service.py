@@ -29,3 +29,10 @@ class Service(IService):
             self.repository.create_user_memory(user_memory)
         except Exception as e:
             raise RuntimeError(f"Error creating user memory: {e}")
+
+    def set_id_external_company(self, id_user: str, id_external_company: int) -> None:
+        """Persist the company identifier on the user."""
+        try:
+            self.repository.set_id_external_company(id_user, id_external_company)
+        except Exception as e:
+            raise RuntimeError(f"Error updating user company: {e}")

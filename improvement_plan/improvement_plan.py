@@ -51,6 +51,7 @@ class IService(ABC):
         id_external_inventory: int | None,
         inventory: str,
         id_external_user: int,
+        id_external_company: int,
         gases,
         scopes,
         categories,

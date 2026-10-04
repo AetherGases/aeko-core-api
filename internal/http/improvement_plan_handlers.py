@@ -39,6 +39,7 @@ class ReportRequestData(BaseModel):
     id_external_context_inventory: int = Field(..., description="External inventory identifier analyzed and stored on the resulting plan.", json_schema_extra={"example": 502})
     inventory: str = Field(..., description="Inventory content as Markdown.", json_schema_extra={"example": "## Escopo 1"})
     id_external_user: int = Field(..., description="External user identifier responsible for the report.", json_schema_extra={"example": 12345})
+    id_external_company: int = Field(..., description="External company identifier that owns the inventory and resulting plan.", json_schema_extra={"example": 90})
     gases: list[CatalogItemData] = Field(..., description="Gas catalog in force for this analysis.")
     scopes: list[CatalogItemData] = Field(..., description="Scope catalog in force for this analysis.")
     categories: list[CategoryCatalogItemData] = Field(..., description="Category catalog in force for this analysis.")
@@ -99,7 +100,9 @@ def get_improvement_plan_service(request: Request) -> IService:
     if database is None:
         raise HTTPException(status_code=503, detail="Database is not initialized")
 
-    return Service(Repository(database))
+    from cmd.api.integrations.mcp.chroma_mcp import _upsert_improvement_plan_problem
+
+    return Service(Repository(database), chroma_indexer=_upsert_improvement_plan_problem)
 
 
 def extracted_inventory_data(inventory: ExtractedInventory) -> ExtractedInventoryData:
@@ -187,6 +190,7 @@ async def input_report(
             body.id_external_context_inventory,
             body.inventory,
             body.id_external_user,
+            body.id_external_company,
             [item.model_dump() for item in body.gases],
             [item.model_dump() for item in body.scopes],
             [item.model_dump() for item in body.categories],

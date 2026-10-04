@@ -45,6 +45,21 @@ class Repository(IRepository):
         except Exception as e:
             raise RuntimeError(f"Error replacing improvement plan in database: {e}")
 
+    @logged(Module.DATABASE, "improvement_plan.list_latest")
+    def list_latest(self, n: int) -> list[ImprovementPlan]:
+        """Retrieve the n most recently updated improvement plans."""
+        try:
+            query, projection = q.get_latest_improvement_plans_query()
+            documents = self.db["improvement_plan"].find(
+                query,
+                projection,
+                sort=[("updated_at", -1)],
+                limit=n,
+            )
+            return [improvement_plan_from_data(data) for data in documents]
+        except Exception as e:
+            raise RuntimeError(f"Error listing latest improvement plans: {e}")
+
 
 def improvement_plan_from_data(data: dict) -> ImprovementPlan:
     """Map a MongoDB document to an improvement plan entity."""
@@ -52,6 +67,7 @@ def improvement_plan_from_data(data: dict) -> ImprovementPlan:
         id=str(data.get("_id")) if data.get("_id") is not None else None,
         id_external_inventory=data.get("id_external_inventory"),
         id_external_unit=data.get("id_external_unit"),
+        id_external_company=data.get("id_external_company"),
         defined_problem=data.get("defined_problem", ""),
         method=data.get("method", ""),
         reasoning=data.get("reasoning", ""),

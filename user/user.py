@@ -24,6 +24,11 @@ class IRepository(ABC):
         """Persist a memory associated with a user."""
         pass
 
+    @abstractmethod
+    def set_id_external_company(self, id_user: str, id_external_company: int) -> None:
+        """Persist the company identifier on the user document."""
+        pass
+
 class IService(ABC):
     @abstractmethod
     def get_mongo_user(self, id_external_user) -> User:
@@ -38,4 +43,9 @@ class IService(ABC):
     @abstractmethod
     def create_user_memory(self, user_memory: UserMemory):
         """Persist a memory associated with a user."""
+        pass
+
+    @abstractmethod
+    def set_id_external_company(self, id_user: str, id_external_company: int) -> None:
+        """Persist the company identifier on the user."""
         pass

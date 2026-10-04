@@ -17,6 +17,7 @@ REPORT_BODY = {
     "id_external_context_inventory": 502,
     "inventory": INVENTORY_MARKDOWN,
     "id_external_user": 12345,
+    "id_external_company": 90,
     "gases": [{"id": 1, "name": "CO2"}],
     "scopes": [{"id": 1, "name": "Escopo 1"}],
     "categories": [{"id": 1, "name": "Combustão estacionária", "classification": None}],
@@ -146,12 +147,14 @@ def test_input_report_forwards_what_the_flow_needs(patched_user_service):
         id_external_inventory,
         inventory,
         id_external_user,
+        id_external_company,
         gases,
         scopes,
         categories,
         user_service,
         analyzer_factory,
     ) = args
+    assert id_external_company == 90
     assert (id_external_inventory, inventory, id_external_user) == (502, INVENTORY_MARKDOWN, 12345)
     assert gases == [{"id": 1, "name": "CO2"}]
     assert scopes == [{"id": 1, "name": "Escopo 1"}]
@@ -226,6 +229,7 @@ def test_input_report_returns_500_when_the_sdk_was_never_configured(patched_user
         "id_external_context_inventory",
         "inventory",
         "id_external_user",
+        "id_external_company",
         "gases",
         "scopes",
         "categories",
@@ -240,7 +244,7 @@ def test_input_report_requires_every_body_field(missing, patched_user_service):
     assert response.status_code == 422
 
 
-@pytest.mark.parametrize("field", ["id_external_context_inventory", "id_external_user"])
+@pytest.mark.parametrize("field", ["id_external_context_inventory", "id_external_user", "id_external_company"])
 def test_the_external_identifiers_must_be_numbers(field, patched_user_service):
     """Verify that the external identifiers must be numbers."""
     body = {**REPORT_BODY, field: "not-a-number"}

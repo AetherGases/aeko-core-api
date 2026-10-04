@@ -29,6 +29,7 @@ REPORT_BODY = {
     "id_external_context_inventory": ID_INVENTORY,
     "inventory": INVENTORY_MARKDOWN,
     "id_external_user": ID_EXTERNAL_USER,
+    "id_external_company": 90,
     "gases": [{"id": 1, "name": "CO2"}],
     "scopes": [{"id": 1, "name": "Escopo 1"}],
     "categories": [{"id": 1, "name": "Combustão estacionária", "classification": None}],
@@ -85,6 +86,13 @@ class InMemoryUserRepository:
     def create_user_memory(self, user_memory):
         """Persist a memory associated with a user."""
         self.memories.append(user_memory)
+
+    def set_id_external_company(self, id_user, id_external_company):
+        """Persist the company identifier on the user."""
+        user = self.get_user_by_id(id_user)
+        if user is None:
+            raise ValueError(f"User with id {id_user} not found.")
+        user.id_external_company = id_external_company
 
 
 class InMemorySessionRepository:
@@ -272,6 +280,30 @@ def test_lifespan_registers_every_agent_in_a_single_call(live_app, fake_sdk):
 
 CALCULATOR_TOOL_NAME = "calculator"
 
+IMPROVEMENT_PLAN_TOOL_NAMES = {
+    "get_improvement_plan_by_inventory",
+    "get_improvement_plan_problem",
+    "get_improvement_plan_method",
+    "get_improvement_plan_reasoning",
+    "list_latest_improvement_plans",
+    "query_improvement_plan_problems",
+}
+
+USER_MEMORY_TOOL_NAMES = {
+    "get_user_profile_by_external_id",
+    "list_user_memory_fields",
+    "get_user_memory_by_field",
+    "list_user_memories",
+}
+
+SESSION_TOOL_NAMES = {
+    "list_user_session_names",
+    "list_latest_user_session_names",
+    "get_session_messages_by_name",
+    "get_latest_session_messages",
+    "count_user_sessions",
+}
+
 
 def test_faq_gets_the_site_map_and_user_memory_tools(live_app, fake_sdk):
     """Verify that faq gets the site map and user memory tools."""
@@ -280,9 +312,14 @@ def test_faq_gets_the_site_map_and_user_memory_tools(live_app, fake_sdk):
         "tavily_map",
         "tavily_search",
         "tavily_research",
-        "find_user_memory",
         CALCULATOR_TOOL_NAME,
-    }
+    } | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES
+
+
+def test_faq_does_not_get_plan_problem_search(live_app, fake_sdk):
+    """Verify that faq does not get plan problem search."""
+    tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools["FAQ"]}
+    assert "query_improvement_plan_problems" not in tool_names
 
 
 ROI_TOOL_NAMES = {"calculate_roi", "calculate_payback"}
@@ -296,10 +333,8 @@ def test_continuous_improvement_coordinator_also_gets_the_roi_tools(live_app, fa
     assert tool_names == {
         "tavily_search",
         "tavily_research",
-        "find_improvement_plan",
-        "find_user_memory",
         CALCULATOR_TOOL_NAME,
-    } | ROI_TOOL_NAMES
+    } | IMPROVEMENT_PLAN_TOOL_NAMES | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES | ROI_TOOL_NAMES
 
 
 @pytest.mark.parametrize(
@@ -318,11 +353,9 @@ def test_green_gas_analyst_also_gets_the_chroma_vector_search(live_app, fake_sdk
     assert tool_names == {
         "tavily_search",
         "tavily_research",
-        "find_improvement_plan",
-        "find_user_memory",
         "query_gases_info",
         CALCULATOR_TOOL_NAME,
-    }
+    } | IMPROVEMENT_PLAN_TOOL_NAMES | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES
 
 
 @pytest.mark.parametrize(
@@ -344,10 +377,8 @@ def test_pollutant_analyst_also_gets_the_climatiq_calculator(live_app, fake_sdk)
     assert tool_names == {
         "tavily_search",
         "tavily_research",
-        "find_improvement_plan",
-        "find_user_memory",
         CALCULATOR_TOOL_NAME,
-    } | CLIMATIQ_TOOL_NAMES
+    } | IMPROVEMENT_PLAN_TOOL_NAMES | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES | CLIMATIQ_TOOL_NAMES
 
 
 @pytest.mark.parametrize(
@@ -363,7 +394,21 @@ def test_no_other_agent_can_reach_climatiq(live_app, fake_sdk, agent):
 def test_inventory_analyst_gets_no_tavily_tools_but_gets_mongo_tools(live_app, fake_sdk):
     """Verify that inventory analyst gets no tavily tools but gets mongo tools."""
     tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools["Análista de inventários"]}
-    assert tool_names == {"find_improvement_plan", "find_user_memory", CALCULATOR_TOOL_NAME}
+    assert tool_names == {CALCULATOR_TOOL_NAME} | IMPROVEMENT_PLAN_TOOL_NAMES | USER_MEMORY_TOOL_NAMES | SESSION_TOOL_NAMES
+
+
+def test_inventory_analyst_gets_chroma_plan_search(live_app, fake_sdk):
+    """Verify that inventory analyst gets chroma plan search."""
+    tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools["Análista de inventários"]}
+    assert "query_improvement_plan_problems" in tool_names
+    assert "search_improvement_plans_by_problem" not in tool_names
+
+
+@pytest.mark.parametrize("agent", sorted(TOOLED_AGENTS))
+def test_no_agent_gets_raw_mongo_find_tools(live_app, fake_sdk, agent):
+    """Verify that no agent gets raw mongo find tools."""
+    tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools[agent]}
+    assert tool_names.isdisjoint({"find_improvement_plan", "find_user_memory"})
 
 
 @pytest.mark.parametrize("agent", sorted(TOOLED_AGENTS))
@@ -471,7 +516,7 @@ def printed_within(capsys, needle, timeout=5.0):
 
 def test_lifespan_warms_up_every_mcp_session_and_closes_it_afterwards(api_main, monkeypatch):
     """Verify that lifespan warms up every mcp session and closes it afterwards."""
-    sessions = (FakeMCPSession("tavily"), FakeMCPSession("mongodb"), FakeMCPSession("chroma"))
+    sessions = (FakeMCPSession("tavily"), FakeMCPSession("chroma"))
     monkeypatch.setattr(api_main, "MCP_SESSIONS", sessions)
     monkeypatch.setattr(api_main, "MCP_WARM_UP", "true")
 
@@ -479,7 +524,7 @@ def test_lifespan_warms_up_every_mcp_session_and_closes_it_afterwards(api_main, 
         for session in sessions:
             assert session.started.wait(timeout=5), f"{session.name} was never started"
 
-    assert [session.closed for session in sessions] == [True, True, True]
+    assert [session.closed for session in sessions] == [True, True]
 
 
 def test_lifespan_spawns_no_mcp_server_when_warm_up_is_switched_off(api_main, monkeypatch):

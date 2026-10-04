@@ -1,1 +1,1 @@
-"""Local arithmetic and investment analysis tools for agents."""
+"""Local arithmetic, investment analysis, and typed MongoDB tools for agents."""

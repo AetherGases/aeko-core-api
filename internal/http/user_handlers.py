@@ -13,6 +13,7 @@ class UserResponseData(BaseModel):
     id_external_user: int = Field(..., description="External identifier of the user.", json_schema_extra={"example": 12345})
     role: str = Field(..., description="Role assigned to the user.", json_schema_extra={"example": "analyst"})
     usecase: str = Field(..., description="User use case or profile category.", json_schema_extra={"example": "report_generation"})
+    id_external_company: int | None = Field(None, description="External identifier of the user's company.", json_schema_extra={"example": None})
 
     model_config = ConfigDict(frozen=True)
 
@@ -39,6 +40,7 @@ def get_user_service(request: Request) -> IService:
                         "id_external_user": 12345,
                         "role": "analyst",
                         "usecase": "report_generation",
+                        "id_external_company": None,
                     }
                 }
             },
@@ -59,6 +61,7 @@ def get_user(
             id_external_user=user.id_external_user,
             role=user.role,
             usecase=user.usecase,
+            id_external_company=user.id_external_company,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

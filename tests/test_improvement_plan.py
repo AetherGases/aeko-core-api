@@ -92,6 +92,11 @@ class StubPlanRepository:
         self.existing = improvement_plan
         return improvement_plan
 
+    def list_latest(self, n):
+        """Retrieve the n most recently updated improvement plans."""
+        self.calls.append(("list_latest", n))
+        return self.result if self.result is not None else []
+
 
 class StubPlan:
     """Stands in for the `AekoImprovementPlan` the SDK returns."""
@@ -189,6 +194,7 @@ class StubUserService:
     def __init__(self, user=USER):
         self.user = user
         self.memories = []
+        self.company_updates = []
 
     def get_mongo_user(self, id_external_user):
         """Retrieve the stored user matching an external identifier."""
@@ -204,6 +210,21 @@ class StubUserService:
         """Persist a memory associated with a user."""
         self.memories.append(user_memory)
 
+    def set_id_external_company(self, id_user, id_external_company):
+        """Persist the company identifier on the user."""
+        self.company_updates.append((id_user, id_external_company))
+
+
+class RecordingIndexer:
+    def __init__(self, error=None):
+        self.error = error
+        self.calls = []
+
+    def __call__(self, id_external_inventory, defined_problem, id_external_company):
+        self.calls.append((id_external_inventory, defined_problem, id_external_company))
+        if self.error is not None:
+            raise self.error
+
 
 def build_repository(collection=None):
     """Build a repository backed by configurable MongoDB doubles."""
@@ -217,13 +238,14 @@ def build_service(repository=None):
 
 
 def run(repository=None, analyzers=None, users=None, id_external_inventory=ID_INVENTORY,
-        inventory=INVENTORY_MARKDOWN, gases=None, scopes=None, categories=None):
+        inventory=INVENTORY_MARKDOWN, id_external_company=90, gases=None, scopes=None, categories=None):
     """Execute the scenario under test."""
     service = build_service(repository)
     return service.input_inventory(
         id_external_inventory,
         inventory,
         ID_EXTERNAL_USER,
+        id_external_company,
         gases if gases is not None else GASES,
         scopes if scopes is not None else SCOPES,
         categories if categories is not None else CATEGORIES,
@@ -238,6 +260,7 @@ def test_entity_defaults_to_an_empty_plan():
 
     assert (plan.id, plan.id_external_inventory, plan.updated_at) == (None, None, None)
     assert plan.id_external_unit is None
+    assert plan.id_external_company is None
     assert (plan.defined_problem, plan.method, plan.reasoning) == ("", "", "")
 
 
@@ -286,6 +309,7 @@ def test_input_inventory_signature_matches_the_interface():
     assert "id_external_inventory" in interface
     assert "inventory" in interface
     assert "id_external_user" in interface
+    assert "id_external_company" in interface
     assert "gases" in interface
     assert "scopes" in interface
     assert "categories" in interface
@@ -394,6 +418,35 @@ def test_replace_wraps_database_failures():
         repository.replace(ImprovementPlan(id_external_inventory=1))
 
 
+def test_list_latest_sorts_and_limits_in_the_find():
+    """Verify that list latest sorts and limits in the find."""
+    repository, collection = build_repository(StubCollection(find_result=[PLAN_DOCUMENT]))
+
+    plans = repository.list_latest(3)
+
+    query, projection = collection.call_args("find")[0]
+    assert query == {}
+    assert projection["_id"] == 0
+    assert collection.find_options[0]["sort"] == [("updated_at", -1)]
+    assert collection.find_options[0]["limit"] == 3
+    assert plans[0].id == "65a8b3d6c0f8e1d7f4b2c020"
+
+
+def test_list_latest_returns_an_empty_list():
+    """Verify that list latest returns an empty list."""
+    repository, _ = build_repository(StubCollection(find_result=[]))
+
+    assert repository.list_latest(3) == []
+
+
+def test_list_latest_wraps_database_failures():
+    """Verify that list latest wraps database failures."""
+    repository, _ = build_repository(StubCollection(error=OSError("boom")))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        repository.list_latest(3)
+
+
 def test_improvement_plan_from_data_handles_a_document_without_an_identifier():
     """Verify that improvement plan from data handles a document without an identifier."""
     plan = improvement_plan_from_data({"id_external_inventory": 2})
@@ -408,12 +461,60 @@ def test_get_by_id_external_inventory_query():
     assert q.get_by_id_external_inventory_query(7) == ({"id_external_inventory": 7}, {})
 
 
+def test_get_improvement_plan_problem_query_projects_only_the_problem():
+    """Verify that get improvement plan problem query projects only the problem."""
+    query, projection = q.get_improvement_plan_problem_query(7)
+
+    assert query == {"id_external_inventory": 7}
+    assert projection == {"_id": 0, "id_external_inventory": 1, "defined_problem": 1}
+
+
+def test_get_improvement_plan_method_query_projects_only_the_method():
+    """Verify that get improvement plan method query projects only the method."""
+    query, projection = q.get_improvement_plan_method_query(7)
+
+    assert query == {"id_external_inventory": 7}
+    assert projection == {"_id": 0, "id_external_inventory": 1, "method": 1}
+
+
+def test_get_improvement_plan_reasoning_query_projects_only_the_reasoning():
+    """Verify that get improvement plan reasoning query projects only the reasoning."""
+    query, projection = q.get_improvement_plan_reasoning_query(7)
+
+    assert query == {"id_external_inventory": 7}
+    assert projection == {"_id": 0, "id_external_inventory": 1, "reasoning": 1}
+
+
+def test_regex_plan_search_is_gone():
+    """Verify that regex plan search is gone."""
+    assert not hasattr(q, "get_by_defined_problem_query")
+    assert not hasattr(q, "get_by_method_query")
+    assert not hasattr(Repository, "search_by_defined_problem")
+    assert not hasattr(Service, "search_by_method")
+
+
+def test_get_latest_improvement_plans_query_lists_catalog_fields_without_id():
+    """Verify that get latest improvement plans query lists catalog fields without id."""
+    query, projection = q.get_latest_improvement_plans_query()
+
+    assert query == {}
+    assert projection == {
+        "_id": 0,
+        "id_external_inventory": 1,
+        "defined_problem": 1,
+        "method": 1,
+        "reasoning": 1,
+        "updated_at": 1,
+    }
+
+
 def test_create_improvement_plan_query_maps_every_field_the_flow_persists():
     """Verify that create improvement plan query maps every field the flow persists."""
     plan = ImprovementPlan(
         id="p1",
         id_external_inventory=1,
         id_external_unit=77,
+        id_external_company=90,
         defined_problem="problem",
         method="PDCA",
         reasoning="why",
@@ -424,12 +525,26 @@ def test_create_improvement_plan_query_maps_every_field_the_flow_persists():
 
     assert document == {
         "id_external_inventory": 1,
+        "id_external_company": 90,
         "defined_problem": "problem",
         "method": "PDCA",
         "reasoning": "why",
         "updated_at": UPDATED_AT,
     }
     assert "id_external_unit" not in document
+
+
+def test_create_omits_id_external_company_when_unset():
+    """Verify that create omits id external company when unset."""
+    plan = ImprovementPlan(id_external_inventory=1, defined_problem="p", method="m", reasoning="r")
+    document = q.create_improvement_plan_query(plan)
+    assert "id_external_company" not in document
+
+
+def test_improvement_plan_from_data_maps_id_external_company():
+    """Verify that improvement plan from data maps id external company."""
+    plan = improvement_plan_from_data({**PLAN_DOCUMENT, "id_external_company": 90})
+    assert plan.id_external_company == 90
 
 
 def test_create_improvement_plan_query_stamps_a_missing_update_timestamp():
@@ -478,6 +593,15 @@ def test_service_replace_delegates_to_the_repository():
 
     assert build_service(repository).replace(plan) is plan
     assert repository.calls == [("replace", plan)]
+
+
+def test_service_list_latest_delegates_to_the_repository():
+    """Verify that service list latest delegates to the repository."""
+    plans = [ImprovementPlan(id="p1")]
+    repository = StubPlanRepository(result=plans)
+
+    assert build_service(repository).list_latest(3) is plans
+    assert repository.calls == [("list_latest", 3)]
 
 
 def test_analyze_receives_the_inventory_as_markdown():
@@ -570,6 +694,27 @@ def test_a_missing_user_is_rejected_before_the_analyzer():
     with pytest.raises(ValueError, match="not found"):
         run(users=StubUserService(user=None), analyzers=analyzers)
 
+    assert analyzers.built == []
+
+
+def test_input_inventory_persists_id_external_company_on_the_plan_and_user():
+    """Verify that input inventory persists id external company on the plan and user."""
+    repository = StubPlanRepository()
+    users = StubUserService()
+
+    run(repository=repository, users=users, id_external_company=90)
+
+    (plan,) = [call[1] for call in repository.calls if call[0] == "create"]
+    assert plan.id_external_company == 90
+    assert users.company_updates == [(ID_USER, 90)]
+
+
+@pytest.mark.parametrize("bad", [None, 0, -1, True, False])
+def test_input_inventory_rejects_an_unusable_company(bad):
+    """Verify that input inventory rejects an unusable company."""
+    analyzers = StubAnalyzerFactory()
+    with pytest.raises(ValueError, match="id_external_company"):
+        run(id_external_company=bad, analyzers=analyzers)
     assert analyzers.built == []
 
 
@@ -716,3 +861,46 @@ def test_a_recording_that_fails_never_takes_the_analysis_down():
         assert run().description == "Boiler-dominated inventory"
     finally:
         set_aeko_metrics_sink(None)
+
+
+def test_input_inventory_indexes_defined_problem_after_create():
+    """Verify that input inventory indexes defined problem after create."""
+    indexer = RecordingIndexer()
+    repository = StubPlanRepository()
+    service = Service(repository, chroma_indexer=indexer)
+
+    service.input_inventory(
+        ID_INVENTORY, INVENTORY_MARKDOWN, ID_EXTERNAL_USER, 90,
+        GASES, SCOPES, CATEGORIES, StubUserService(), StubAnalyzerFactory(),
+    )
+
+    assert indexer.calls == [(ID_INVENTORY, "high scope 1 emissions", 90)]
+
+
+def test_input_inventory_indexes_defined_problem_after_replace():
+    """Verify that input inventory indexes defined problem after replace."""
+    indexer = RecordingIndexer()
+    repository = StubPlanRepository(
+        existing=previous_plan(ID_INVENTORY, "old", "old", "old")
+    )
+    service = Service(repository, chroma_indexer=indexer)
+
+    service.input_inventory(
+        ID_INVENTORY, INVENTORY_MARKDOWN, ID_EXTERNAL_USER, 90,
+        GASES, SCOPES, CATEGORIES, StubUserService(), StubAnalyzerFactory(),
+    )
+
+    assert indexer.calls == [(ID_INVENTORY, "high scope 1 emissions", 90)]
+    assert [call[0] for call in repository.calls].count("replace") == 1
+
+
+def test_input_inventory_wraps_indexer_failure():
+    """Verify that input inventory wraps indexer failure."""
+    indexer = RecordingIndexer(error=LookupError("upsert_improvement_plan_problem"))
+    service = Service(StubPlanRepository(), chroma_indexer=indexer)
+
+    with pytest.raises(RuntimeError, match="upsert_improvement_plan_problem"):
+        service.input_inventory(
+            ID_INVENTORY, INVENTORY_MARKDOWN, ID_EXTERNAL_USER, 90,
+            GASES, SCOPES, CATEGORIES, StubUserService(), StubAnalyzerFactory(),
+        )

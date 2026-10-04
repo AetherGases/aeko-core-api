@@ -22,6 +22,7 @@ def test_standalone_server_loads_package_constants(monkeypatch):
         namespace = runpy.run_path(str(script))
         assert not namespace["__package__"]
         assert namespace["GASES_INFO_COLLECTION"] == constants.GASES_INFO_COLLECTION
+        assert namespace["IMPROVEMENT_PLAN_PROBLEMS_COLLECTION"] == constants.IMPROVEMENT_PLAN_PROBLEMS_COLLECTION
         assert namespace["EMBEDDING_MODEL"] == constants.EMBEDDING_MODEL
         assert namespace["DEFAULT_RESULT_COUNT"] == constants.DEFAULT_RESULT_COUNT
         assert namespace["QUERY_INCLUDE"] == constants.QUERY_INCLUDE
@@ -39,21 +40,32 @@ class FakeCollection:
     def __init__(self, result=None):
         self.result = result if result is not None else {"documents": [[]]}
         self.queries = []
+        self.upserts = []
 
     def query(self, **kwargs):
         """Record a vector query and return scripted search results."""
         self.queries.append(kwargs)
         return self.result
 
+    def upsert(self, **kwargs):
+        """Record an upsert of embedded plan problems."""
+        self.upserts.append(kwargs)
+
 
 class FakeClient:
     def __init__(self, collection=None):
         self.collection = collection or FakeCollection()
         self.get_collection_calls = []
+        self.get_or_create_collection_calls = []
 
     def get_collection(self, name, embedding_function=None):
         """Record the collection lookup and return the test collection."""
         self.get_collection_calls.append((name, embedding_function))
+        return self.collection
+
+    def get_or_create_collection(self, name, embedding_function=None):
+        """Record get-or-create and return the test collection."""
+        self.get_or_create_collection_calls.append((name, embedding_function))
         return self.collection
 
 
@@ -90,6 +102,7 @@ def reset_server_state(monkeypatch):
     RecordingCloudClient.instances = []
     RecordingEmbeddingFunction.instances = []
     monkeypatch.setattr(chroma_mcp_server, "_collection", None)
+    monkeypatch.setattr(chroma_mcp_server, "_plan_collection", None)
     yield
 
 
@@ -150,6 +163,18 @@ def test_get_collection_pins_the_gases_info_collection_and_the_embedding_functio
     assert client.get_collection_calls == [("gases-info", embedding_function)]
 
 
+def test_get_plan_collection_pins_the_problems_collection(monkeypatch):
+    """Verify that get plan collection pins the problems collection."""
+    client = FakeClient()
+    embedding_function = object()
+    monkeypatch.setattr(chroma_mcp_server, "_build_client", lambda: client)
+    monkeypatch.setattr(chroma_mcp_server, "_embedding_function", lambda: embedding_function)
+
+    chroma_mcp_server._get_plan_collection()
+
+    assert client.get_or_create_collection_calls == [("improvement-plan-problems", embedding_function)]
+
+
 def test_get_collection_is_resolved_once_per_process(monkeypatch):
     """Verify that get collection is resolved once per process."""
     builds = []
@@ -169,6 +194,48 @@ def query(**kwargs):
 
     result = chroma_mcp_server.query_gases_info(**kwargs)
     return asyncio.run(result) if inspect.isawaitable(result) else result
+
+
+def invoke(function, /, *args, **kwargs):
+    """Run an MCP tool, awaiting it when FastMCP returns a coroutine."""
+
+    result = function(*args, **kwargs)
+    return asyncio.run(result) if inspect.isawaitable(result) else result
+
+
+def test_query_improvement_plan_problems_filters_by_company(monkeypatch):
+    """Verify that query improvement plan problems filters by company."""
+    collection = FakeCollection()
+    monkeypatch.setattr(chroma_mcp_server, "_get_plan_collection", lambda: collection)
+
+    invoke(
+        chroma_mcp_server.query_improvement_plan_problems,
+        query_texts=["flaring"],
+        id_external_company=90,
+    )
+
+    recorded = collection.queries[-1]
+    assert recorded["query_texts"] == ["flaring"]
+    assert recorded["where"] == {"id_external_company": 90}
+    assert recorded["n_results"] == 5
+    assert "embeddings" not in recorded["include"]
+
+
+def test_upsert_improvement_plan_problem_uses_inventory_id(monkeypatch):
+    """Verify that upsert improvement plan problem uses inventory id."""
+    collection = FakeCollection()
+    monkeypatch.setattr(chroma_mcp_server, "_get_plan_collection", lambda: collection)
+
+    result = invoke(
+        chroma_mcp_server.upsert_improvement_plan_problem, 502, "flaring at the stack", 90
+    )
+
+    assert result == {"id": "502"}
+    assert collection.upserts[-1] == {
+        "ids": ["502"],
+        "documents": ["flaring at the stack"],
+        "metadatas": [{"id_external_inventory": 502, "id_external_company": 90}],
+    }
 
 
 def test_query_gases_info_searches_the_pinned_collection(monkeypatch):
@@ -230,6 +297,7 @@ def started_server(monkeypatch):
 def test_main_serves_over_stdio(monkeypatch, started_server):
     """Verify that main serves over stdio."""
     monkeypatch.setattr(chroma_mcp_server, "_get_collection", lambda: FakeCollection())
+    monkeypatch.setattr(chroma_mcp_server, "_get_plan_collection", lambda: FakeCollection())
 
     chroma_mcp_server.main()
 
@@ -237,25 +305,43 @@ def test_main_serves_over_stdio(monkeypatch, started_server):
 
 
 def test_main_warms_the_collection_up_before_serving(monkeypatch, started_server):
-    """Verify that main warms the collection up before serving."""
+    """Verify that main warms the gases and plan collections before serving."""
     warmed = []
-    monkeypatch.setattr(
-        chroma_mcp_server, "_get_collection", lambda: warmed.append(1) or FakeCollection()
-    )
+    warmed_plan = []
+
+    def warm_gases():
+        """Record the gases warm-up and confirm the server has not started."""
+        assert started_server == []
+        warmed.append(1)
+        return FakeCollection()
+
+    def warm_plan():
+        """Record the plan warm-up and confirm the server has not started."""
+        assert started_server == []
+        warmed_plan.append(1)
+        return FakeCollection()
+
+    monkeypatch.setattr(chroma_mcp_server, "_get_collection", warm_gases)
+    monkeypatch.setattr(chroma_mcp_server, "_get_plan_collection", warm_plan)
 
     chroma_mcp_server.main()
 
     assert warmed == [1]
+    assert warmed_plan == [1]
+    assert started_server == ["stdio"]
 
 
-def test_main_still_serves_when_the_warm_up_fails(monkeypatch, started_server):
-    """Verify that main still serves when the warm up fails."""
+@pytest.mark.parametrize("failing_getter", ["_get_collection", "_get_plan_collection"])
+def test_main_still_serves_when_the_warm_up_fails(monkeypatch, started_server, failing_getter):
+    """Verify that main still serves when either collection warm-up fails."""
 
     def explode():
         """Raise the configured failure to exercise error handling."""
         raise RuntimeError("CHROMA_API_KEY is not set in the MCP server's environment.")
 
-    monkeypatch.setattr(chroma_mcp_server, "_get_collection", explode)
+    monkeypatch.setattr(chroma_mcp_server, "_get_collection", lambda: FakeCollection())
+    monkeypatch.setattr(chroma_mcp_server, "_get_plan_collection", lambda: FakeCollection())
+    monkeypatch.setattr(chroma_mcp_server, failing_getter, explode)
 
     chroma_mcp_server.main()
 

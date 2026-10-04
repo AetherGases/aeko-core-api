@@ -11,8 +11,9 @@ from user.user import IService as IUserService, UserMemory
 
 
 class Service(IService):
-    def __init__(self, repository: IRepository):
+    def __init__(self, repository: IRepository, chroma_indexer=None):
         self.repository = repository
+        self.chroma_indexer = chroma_indexer
 
     def get_by_id_external_inventory(self, id_external_inventory) -> ImprovementPlan:
         """Retrieve the improvement plan associated with an external inventory identifier."""
@@ -26,11 +27,16 @@ class Service(IService):
         """Replace the plan stored for the same external inventory identifier."""
         return self.repository.replace(improvement_plan)
 
+    def list_latest(self, n: int) -> list[ImprovementPlan]:
+        """Retrieve the n most recently updated improvement plans."""
+        return self.repository.list_latest(n)
+
     def input_inventory(
         self,
         id_external_inventory: int | None,
         inventory: str,
         id_external_user: int,
+        id_external_company: int,
         gases,
         scopes,
         categories,
@@ -44,6 +50,12 @@ class Service(IService):
             raise ValueError("inventory is required to analyze an inventory.")
 
         user = user_service.get_mongo_user(id_external_user)
+        if (
+            isinstance(id_external_company, bool)
+            or not isinstance(id_external_company, int)
+            or id_external_company <= 0
+        ):
+            raise ValueError("id_external_company is required to analyze an inventory.")
 
         existing = _current_plan(self.repository, id_external_inventory)
 
@@ -65,12 +77,23 @@ class Service(IService):
         extracted_inventory = extracted_inventory_from_aeko(analysis.inventory)
 
         improvement_plan = improvement_plan_from_aeko_plan(analysis.plan)
+        improvement_plan.id_external_company = id_external_company
         if existing is None:
             improvement_plan = self.create(improvement_plan)
         else:
             improvement_plan.id = existing.id
             improvement_plan = self.replace(improvement_plan)
 
+        user_service.set_id_external_company(user.id, id_external_company)
+        if self.chroma_indexer is not None:
+            try:
+                self.chroma_indexer(
+                    improvement_plan.id_external_inventory,
+                    improvement_plan.defined_problem,
+                    improvement_plan.id_external_company,
+                )
+            except Exception as exc:
+                raise RuntimeError(f"Error indexing improvement plan problem: {exc}") from exc
         user_service.create_user_memory(
             UserMemory(
                 id=None,

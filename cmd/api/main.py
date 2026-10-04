@@ -15,11 +15,17 @@ from pymongo import MongoClient
 from redis import Redis
 
 from cmd.api.integrations.climatiq_api import get_climatiq_tools
-from cmd.api.integrations.mcp.chroma_mcp import CHROMA_SESSION, get_gases_info_tools
-from cmd.api.integrations.mcp.mongo_mcp import (
-    MONGO_SESSION,
+from cmd.api.integrations.mcp.chroma_mcp import (
+    CHROMA_SESSION,
+    configure as configure_chroma_tools,
+    get_gases_info_tools,
+    get_improvement_plan_problem_tools,
+)
+from cmd.api.tools.mongo_tools import (
+    configure as configure_mongo_tools,
     get_improvement_plan_tools,
     get_user_memory_tools,
+    get_session_tools,
 )
 from cmd.api.integrations.mcp.tavily_mcp import (
     TAVILY_SESSION,
@@ -34,7 +40,10 @@ from aeko_metrics.service import Service as AekoMetricsService
 from hub_metrics.database.repository import Repository as HubMetricsRepository
 from hub_metrics.entity import Metric
 from hub_metrics.service import Service as HubMetricsService
+from cmd.memory_generator_worker.constants import REDIS_SCAN_COUNT, SESSION_INACTIVITY_MINUTES
+from improvement_plan.database.repository import Repository as ImprovementPlanRepository
 from improvement_plan.improvement_plan import MalformedPlanError
+from improvement_plan.service import Service as ImprovementPlanService
 from internal.http.aeko_metrics_handlers import router as aeko_metrics_router
 from internal.http.hub_metrics_handlers import router as hub_metrics_router
 from internal.http.improvement_plan_handlers import router as improvement_plan_router
@@ -50,7 +59,12 @@ from internal.shared import (
     set_event_sink,
     silence_uvicorn_access_log,
 )
+from session.cache.repository import Repository as SessionCacheRepository
+from session.database.repository import Repository as SessionRepository
+from session.service import Service as SessionService
 from session.session import GuardrailRejectedError
+from user.database.repository import Repository as UserRepository
+from user.service import Service as UserService
 
 
 from aeko import (
@@ -86,8 +100,11 @@ TAVILY_SITE_MAP_TOOLS = [AekoTool(tool=tool) for tool in get_tavily_site_map_too
 TAVILY_RESEARCH_TOOLS = [AekoTool(tool=tool) for tool in get_tavily_search_tools()]
 
 
-IMPROVEMENT_PLAN_TOOLS = [AekoTool(tool=tool) for tool in get_improvement_plan_tools()]
+IMPROVEMENT_PLAN_TOOLS = [AekoTool(tool=tool) for tool in get_improvement_plan_tools()] + [
+    AekoTool(tool=tool) for tool in get_improvement_plan_problem_tools()
+]
 USER_MEMORY_TOOLS = [AekoTool(tool=tool) for tool in get_user_memory_tools()]
+SESSION_TOOLS = [AekoTool(tool=tool) for tool in get_session_tools()]
 
 
 GASES_INFO_TOOLS = [AekoTool(tool=tool) for tool in get_gases_info_tools()]
@@ -107,32 +124,37 @@ AEKO_TOOLS = {
     "FAQ": list(TAVILY_SITE_MAP_TOOLS)
     + list(TAVILY_RESEARCH_TOOLS)
     + list(USER_MEMORY_TOOLS)
+    + list(SESSION_TOOLS)
     + list(CALCULATOR_TOOLS),
     "Análista de inventários": list(IMPROVEMENT_PLAN_TOOLS)
     + list(USER_MEMORY_TOOLS)
+    + list(SESSION_TOOLS)
     + list(CALCULATOR_TOOLS),
 
     "Analista de Poluentes": list(TAVILY_RESEARCH_TOOLS)
     + list(IMPROVEMENT_PLAN_TOOLS)
     + list(USER_MEMORY_TOOLS)
+    + list(SESSION_TOOLS)
     + list(CLIMATIQ_TOOLS)
     + list(CALCULATOR_TOOLS),
 
     "Analista de Gases Verdes": list(TAVILY_RESEARCH_TOOLS)
     + list(IMPROVEMENT_PLAN_TOOLS)
     + list(USER_MEMORY_TOOLS)
+    + list(SESSION_TOOLS)
     + list(GASES_INFO_TOOLS)
     + list(CALCULATOR_TOOLS),
 
     "Coordenador de Melhoria Contínua": list(TAVILY_RESEARCH_TOOLS)
     + list(IMPROVEMENT_PLAN_TOOLS)
     + list(USER_MEMORY_TOOLS)
+    + list(SESSION_TOOLS)
     + list(CALCULATOR_TOOLS)
     + list(ROI_PAYBACK_TOOLS),
 }
 
 
-MCP_SESSIONS = (TAVILY_SESSION, MONGO_SESSION, CHROMA_SESSION)
+MCP_SESSIONS = (TAVILY_SESSION, CHROMA_SESSION)
 
 
 MCP_WARM_UP = os.getenv("AEKO_MCP_WARM_UP", "true")
@@ -358,11 +380,27 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         raise RuntimeError(f"Failed to connect to Redis: {exc}") from exc
 
+    configure_mongo_tools(
+        improvement_plans=ImprovementPlanService(ImprovementPlanRepository(db)),
+        users=UserService(UserRepository(db)),
+        sessions=SessionService(
+            SessionRepository(db),
+            SessionCacheRepository(redis_client, scan_count=REDIS_SCAN_COUNT),
+            inactivity_minutes=SESSION_INACTIVITY_MINUTES,
+        ),
+    )
+    configure_chroma_tools(
+        users=UserService(UserRepository(db)),
+        improvement_plans=ImprovementPlanService(ImprovementPlanRepository(db)),
+    )
+
     if MCP_WARM_UP.strip().lower() not in {"false", "0", "no"}:
         _warm_up_mcp_sessions()
 
     yield
 
+    configure_mongo_tools()
+    configure_chroma_tools()
     set_event_sink(None)
     set_aeko_metrics_sink(None)
 

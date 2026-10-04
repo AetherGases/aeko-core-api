@@ -37,6 +37,10 @@ class StubUserRepository:
         """Persist a memory associated with a user."""
         return self._run("create_user_memory", user_memory)
 
+    def set_id_external_company(self, id_user, id_external_company):
+        """Persist the company identifier on the user document."""
+        return self._run("set_id_external_company", id_user, id_external_company)
+
 
 def test_service_implements_the_service_interface():
     """Verify that service implements the service interface."""
@@ -85,6 +89,13 @@ def test_get_user_memories_wraps_unexpected_errors():
 
     with pytest.raises(RuntimeError, match="mongo down"):
         service.get_user_memories("u1")
+
+
+def test_set_id_external_company_delegates_to_the_repository():
+    """Verify that set id external company delegates to the repository."""
+    repository = StubUserRepository()
+    Service(repository).set_id_external_company("u1", 90)
+    assert repository.calls == [("set_id_external_company", "u1", 90)]
 
 
 def test_create_user_memory_delegates_to_the_repository():

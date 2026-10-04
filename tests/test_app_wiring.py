@@ -41,6 +41,11 @@ def request_with(db):
     return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(db=db)))
 
 
+def test_mcp_sessions_are_tavily_and_chroma(api_main):
+    """Verify that mcp sessions are tavily and chroma."""
+    assert [session.name for session in api_main.MCP_SESSIONS] == ["tavily", "chroma"]
+
+
 def test_report_route_is_registered_on_the_application(api_main):
     """Verify that report route is registered on the application."""
     paths = api_main.app.openapi()["paths"]
@@ -175,7 +180,12 @@ def test_get_user_runs_through_the_concrete_repository():
     response = build_client(user_handlers.router, database).get("/aether-api/v1/ai/user/12345")
 
     assert response.status_code == 200
-    assert response.json() == {"id_external_user": 12345, "role": "analyst", "usecase": "report_generation"}
+    assert response.json() == {
+        "id_external_user": 12345,
+        "role": "analyst",
+        "usecase": "report_generation",
+        "id_external_company": None,
+    }
 
 
 def test_get_user_returns_404_when_the_document_does_not_exist():

@@ -1,7 +1,7 @@
 """Verify the ChatGPT MCP tool catalog and FastMCP server definition."""
 
 from cmd.api.acl.catalog import chatgpt_tool_names, get_chatgpt_tools
-from cmd.api.acl.mcp_server import mcp
+from cmd.api.acl.mcp_server import build_mcp_server, mcp
 
 EXPECTED = {
     "get_improvement_plan_by_inventory",
@@ -19,9 +19,6 @@ EXPECTED = {
     "get_latest_session_messages",
     "count_user_sessions",
     "query_gases_info",
-    "tavily_search",
-    "tavily_research",
-    "tavily_map",
     "climatiq_search",
     "climatiq_estimate",
     "calculator",
@@ -42,7 +39,7 @@ def test_chatgpt_catalog_has_no_duplicate_tool_names():
     """Verify that every tool name appears once in the catalog."""
     names = [tool.name for tool in get_chatgpt_tools()]
 
-    assert len(names) == len(set(names)) == 26
+    assert len(names) == len(set(names)) == 23
 
 
 def test_chatgpt_catalog_omits_metrics_and_chroma_upsert():
@@ -66,14 +63,16 @@ def test_fastmcp_server_is_named_aeko_chatgpt():
 
 def test_fastmcp_server_registers_every_catalog_tool():
     """Verify that the FastMCP server registers exactly the catalog tools."""
-    registered = {tool.name for tool in mcp._tool_manager.list_tools()}
+    from cmd.api.acl.mcp_server import build_mcp_server
+    from cmd.api.acl.catalog import chatgpt_tool_names
 
-    assert registered == EXPECTED
+    registered = {tool.name for tool in build_mcp_server()._tool_manager.list_tools()}
+    assert registered == chatgpt_tool_names()
 
 
 def test_fastmcp_tool_arguments_never_start_with_an_underscore():
     """Verify that private parameter names are exposed without their underscore."""
-    for registered in mcp._tool_manager.list_tools():
+    for registered in build_mcp_server()._tool_manager.list_tools():
         assert not any(name.startswith("_") for name in registered.parameters["properties"])
 
 
@@ -151,35 +150,48 @@ def test_fastmcp_runs_a_slow_sync_tool_without_blocking_the_event_loop(monkeypat
 
 def test_fastmcp_async_wrapper_keeps_the_published_signature():
     """Verify that offloaded tools still publish their stripped parameter names."""
+    registered = {
+        tool.name: tool.parameters
+        for tool in build_mcp_server()._tool_manager.list_tools()
+    }
     properties = {
-        tool.name: tool.parameters["properties"] for tool in mcp._tool_manager.list_tools()
+        name: parameters["properties"]
+        for name, parameters in registered.items()
     }
 
-    assert "input" in properties["tavily_map"]
-    assert "_input" not in properties["tavily_map"]
     assert set(properties["analyze_inventory"]) == {
-        "id_external_user",
         "name",
-        "fileName",
         "fileType",
-        "ticket",
+        "file",
     }
+    assert set(properties["get_inventory_analysis"]) == {"id"}
+    nested = properties["analyze_inventory"]["file"]
+    if "$ref" in nested:
+        nested = registered["analyze_inventory"]["$defs"][nested["$ref"].rsplit("/", 1)[-1]]
+    assert set(nested["properties"]) == {
+        "download_url",
+        "file_id",
+        "mime_type",
+        "file_name",
+    }
+    assert set(nested["required"]) == {"download_url", "file_id"}
 
 
 def test_chatgpt_inventory_and_ask_descriptions_drive_the_partial_answer():
-    """Verify that tool descriptions tell the model how to run the two-step upload flow."""
+    """Verify that tool descriptions tell the model how to run in-chat inventory ingest."""
     descriptions = {tool.name: tool.description for tool in get_chatgpt_tools()}
-    registered = {tool.name: tool.description for tool in mcp._tool_manager.list_tools()}
+    registered = {tool.name: tool.description for tool in build_mcp_server()._tool_manager.list_tools()}
     analyze = descriptions["analyze_inventory"]
 
     for text in (analyze, registered["analyze_inventory"]):
-        assert "Aether app" in text
+        assert "Aether app" not in text
+        assert "ticket" not in text
         assert "get_inventory_analysis" in text
         assert "IMAGE" in text and "XLSX" in text
-        assert "ticket" in text and "id_external_user" in text
+        assert "id_external_user" not in text
     assert "PROCESSING" in descriptions["get_inventory_analysis"]
     assert "analyze_inventory" in descriptions["get_inventory_analysis"]
-    assert "id_external_user" in descriptions["ask_aeko"]
+    assert "id_external_user" not in descriptions["ask_aeko"]
     assert "session_name" in descriptions["ask_aeko"]
     assert registered["ask_aeko"] == descriptions["ask_aeko"]
 
@@ -188,5 +200,19 @@ def test_fastmcp_tools_keep_the_catalog_descriptions():
     """Verify that registered tools carry the LangChain tool descriptions."""
     descriptions = {tool.name: tool.description for tool in get_chatgpt_tools()}
 
-    for registered in mcp._tool_manager.list_tools():
+    for registered in build_mcp_server()._tool_manager.list_tools():
         assert registered.description == descriptions[registered.name]
+
+
+def test_authenticated_chatgpt_tools_declare_oauth2_security_schemes():
+    """Verify that authenticated chatgpt tools declare oauth2 security schemes."""
+    from cmd.api.acl.catalog import AUTHENTICATED_CHATGPT_TOOL_NAMES
+    from cmd.api.acl.mcp_server import build_mcp_server
+
+    for registered in build_mcp_server()._tool_manager.list_tools():
+        meta = registered.meta or {}
+        schemes = meta.get("securitySchemes") or getattr(registered, "securitySchemes", None)
+        if registered.name in AUTHENTICATED_CHATGPT_TOOL_NAMES:
+            assert schemes == [{"type": "oauth2", "scopes": ["mcp"]}]
+        else:
+            assert schemes == [{"type": "noauth"}]

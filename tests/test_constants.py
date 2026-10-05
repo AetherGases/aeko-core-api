@@ -15,6 +15,7 @@ import pytest
         "cmd/api/integrations/mcp",
         "cmd/memory_generator_worker",
         "improvement_plan",
+        "oauth",
     ],
 )
 def test_package_constants_have_one_definition_module(package):
@@ -49,6 +50,9 @@ def test_package_constants_have_one_definition_module(package):
         ("cmd/api/integrations/mcp", "DEFAULT_CALL_TIMEOUT", "17.5", 17.5),
         ("cmd/memory_generator_worker", "SESSION_INACTIVITY_MINUTES", "30", 30),
         ("upload_ticket", "INVENTORY_UPLOAD_TICKET_TTL_SECONDS", "600", 600),
+        ("oauth", "OAUTH_AUTHORIZATION_CODE_TTL_SECONDS", "300", 300),
+        ("oauth", "OAUTH_ACCESS_TOKEN_TTL_SECONDS", "3600", 3600),
+        ("oauth", "OAUTH_CLIENT_ID", "chatgpt", "chatgpt"),
     ],
 )
 def test_constants_use_environment_overrides(monkeypatch, package, key, value, expected):

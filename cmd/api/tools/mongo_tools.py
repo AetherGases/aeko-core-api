@@ -229,12 +229,23 @@ def _get_improvement_plan_reasoning(id_external_inventory: int) -> list[dict[str
     return _plan_by_inventory(id_external_inventory, ("id_external_inventory", "reasoning"))
 
 
-@logged(Module.TOOL, "list_latest_improvement_plans")
-def _list_latest_improvement_plans(n: int) -> list[dict[str, Any]]:
-    """Return the n most recently updated improvement plans."""
+def _company_id(user: User) -> int:
+    """Resolve the user's company, rejecting a missing or non-positive value."""
 
+    company = user.id_external_company
+    if company is None:
+        raise ValueError("id_external_company is required to search improvement plans.")
+    return _positive_int(company, "id_external_company")
+
+
+@logged(Module.TOOL, "list_latest_improvement_plans")
+def _list_latest_improvement_plans(id_external_user: int, n: int) -> list[dict[str, Any]]:
+    """Return the n most recently updated improvement plans for the user's company."""
+
+    user = _require_user(id_external_user)
+    company = _company_id(user)
     limit = _positive_int(n, "n")
-    documents = [_plan_catalog(plan) for plan in _plans().list_latest(limit)]
+    documents = [_plan_catalog(plan) for plan in _plans().list_latest(limit, company)]
     return _newest_first(documents, "updated_at")[:limit]
 
 

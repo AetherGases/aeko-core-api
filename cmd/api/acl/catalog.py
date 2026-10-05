@@ -2,18 +2,16 @@
 
 The catalog is the union of the tools already used by the Aeko agents plus the
 ChatGPT-only tools. Metrics and Chroma write tools are never part of it.
+Tavily stays on Aeko agents and is omitted here.
 """
 
 from langchain_core.tools import Tool
 
+from cmd.api.acl.wrappers import wrap_chatgpt_tools
 from cmd.api.integrations.climatiq_api import get_climatiq_tools
 from cmd.api.integrations.mcp.chroma_mcp import (
     get_gases_info_tools,
     get_improvement_plan_problem_tools,
-)
-from cmd.api.integrations.mcp.tavily_mcp import (
-    get_tavily_search_tools,
-    get_tavily_site_map_tool,
 )
 from cmd.api.tools.ask_aeko import get_ask_aeko_tools
 from cmd.api.tools.calculator import get_calculator_tools
@@ -25,14 +23,41 @@ from cmd.api.tools.mongo_tools import (
     get_user_memory_tools,
 )
 
+ANONYMOUS_CHATGPT_TOOL_NAMES = {
+    "query_gases_info",
+    "climatiq_search",
+    "climatiq_estimate",
+    "calculator",
+    "calculate_roi",
+    "calculate_payback",
+}
+
+AUTHENTICATED_CHATGPT_TOOL_NAMES = {
+    "ask_aeko",
+    "analyze_inventory",
+    "get_inventory_analysis",
+    "get_user_profile_by_external_id",
+    "list_user_memory_fields",
+    "get_user_memory_by_field",
+    "list_user_memories",
+    "list_user_session_names",
+    "get_session_messages_by_name",
+    "get_latest_session_messages",
+    "count_user_sessions",
+    "get_improvement_plan_by_inventory",
+    "get_improvement_plan_problem",
+    "get_improvement_plan_method",
+    "get_improvement_plan_reasoning",
+    "list_latest_improvement_plans",
+    "query_improvement_plan_problems",
+}
+
 _CATALOG_GETTERS = (
     get_improvement_plan_tools,
     get_improvement_plan_problem_tools,
     get_user_memory_tools,
     get_session_tools,
     get_gases_info_tools,
-    get_tavily_search_tools,
-    get_tavily_site_map_tool,
     get_climatiq_tools,
     get_calculator_tools,
     get_roi_payback_tools,
@@ -48,7 +73,7 @@ def get_chatgpt_tools() -> list[Tool]:
     for getter in _CATALOG_GETTERS:
         for tool in getter():
             tools.setdefault(tool.name, tool)
-    return list(tools.values())
+    return wrap_chatgpt_tools(list(tools.values()))
 
 
 def chatgpt_tool_names() -> set[str]:

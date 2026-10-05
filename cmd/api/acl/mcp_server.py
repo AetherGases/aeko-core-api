@@ -1,7 +1,9 @@
 """Build the FastMCP server that serves the ChatGPT tool catalog over HTTP."""
 
+import contextvars
 import functools
 import inspect
+from pathlib import Path
 from typing import Any, Callable
 
 import anyio.to_thread
@@ -9,8 +11,13 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from cmd.api.acl.catalog import get_chatgpt_tools
+from cmd.api.acl.mcp_meta import INVENTORY_WIDGET_URI, tool_meta
 
 SERVER_NAME = "aeko-chatgpt"
+INVENTORY_WIDGET_MIME = "text/html;profile=mcp-app"
+INVENTORY_WIDGET_PATH = (
+    Path(__file__).resolve().parent / "widgets" / "analyze_inventory.html"
+)
 
 
 def expose_function(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -64,7 +71,10 @@ def run_in_worker_thread(func: Callable[..., Any]) -> Callable[..., Any]:
     async def call(**kwargs: Any) -> Any:
         """Run the wrapped tool off the event loop."""
 
-        return await anyio.to_thread.run_sync(functools.partial(exposed, **kwargs))
+        ctx = contextvars.copy_context()
+        return await anyio.to_thread.run_sync(
+            ctx.run, functools.partial(exposed, **kwargs)
+        )
 
     call.__signature__ = inspect.signature(exposed)
     return call
@@ -87,7 +97,15 @@ def build_mcp_server() -> FastMCP:
             run_in_worker_thread(tool.func),
             name=tool.name,
             description=tool.description,
+            meta=tool_meta(tool.name),
         )
+
+    @server.resource(INVENTORY_WIDGET_URI, mime_type=INVENTORY_WIDGET_MIME)
+    def analyze_inventory_widget() -> str:
+        """Return the in-chat inventory upload form."""
+
+        return INVENTORY_WIDGET_PATH.read_text(encoding="utf-8")
+
     return server
 
 

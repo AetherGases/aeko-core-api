@@ -109,6 +109,10 @@ class Service(IService):
         """Return inventory identifiers created from upload tickets for a user."""
         return self.repository.get_created_ids(id_external_user)
 
+    def record_created_inventory(self, id_external_user: int, inventory_id: int) -> None:
+        """Record an inventory created through ChatGPT ingest for later analysis."""
+        self.repository.append_created_id(id_external_user, inventory_id)
+
     def _load(
         self,
         id_external_user: int,

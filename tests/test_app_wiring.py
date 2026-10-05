@@ -65,6 +65,8 @@ def test_report_route_is_registered_on_the_application(api_main):
         "/aether-api/v1/ai/user/{id_external_user}/inventory-upload/{ticket}/complete",
         REPORT_ROUTE,
         "/aether-api/v1/ai/report/{id_external_inventory}",
+        "/aether-api/v1/oauth/authorize",
+        "/aether-api/v1/oauth/token",
     ],
 )
 def test_every_documented_route_is_registered(api_main, path):
@@ -73,6 +75,34 @@ def test_every_documented_route_is_registered(api_main, path):
 
 
 MCP_PREFIX = "/aether-api/v1/mcp"
+
+
+def registered_route_paths(app):
+    """Collect HTTP paths from the application, including nested included routers."""
+    paths = set()
+
+    def walk(routes):
+        """Record paths from a route list and walk included routers."""
+        for route in routes:
+            path = getattr(route, "path", None)
+            if path:
+                paths.add(path)
+            nested = getattr(route, "original_router", None)
+            if nested is not None:
+                walk(nested.routes)
+            elif hasattr(route, "routes"):
+                walk(route.routes)
+
+    walk(app.routes)
+    return paths
+
+
+def test_oauth_well_known_routes_are_registered(api_main):
+    """Verify that OAuth discovery routes are registered on the application."""
+    paths = registered_route_paths(api_main.app)
+
+    assert "/.well-known/oauth-authorization-server" in paths
+    assert "/.well-known/oauth-protected-resource" in paths
 
 
 def test_chatgpt_mcp_app_is_mounted_at_the_documented_prefix(api_main):
@@ -97,6 +127,7 @@ def test_lifespan_configures_and_clears_the_chatgpt_tool_bindings(api_main):
 
     with TestClient(api_main.app) as client:
         assert client.app.state.ticket_service is not None
+        assert client.app.state.oauth is not None
         assert inventory_tools._tickets_service is client.app.state.ticket_service
         assert inventory_tools._create_inventory is not None
         assert inventory_tools._plans_service is not None
@@ -130,6 +161,8 @@ def test_chatgpt_mcp_accepts_initialize_on_a_public_host(api_main):
         response = client.post(f"{MCP_PREFIX}/", headers=headers, json=body)
 
     assert response.status_code == 200
+    assert response.status_code != 401
+    assert "www-authenticate" not in response.headers
     assert "aeko-chatgpt" in response.text
 
 

@@ -1,0 +1,141 @@
+"""Verify profile microservice client behavior and error handling."""
+
+import json
+
+import pytest
+import requests
+
+PROFILE_PAYLOAD = {
+    "id": 1,
+    "cpf": "12345678901",
+    "email": "caio@example.com",
+    "name": "Caio Marcos",
+    "phone": "11999999999",
+    "image": {"id": 10, "name": "profile.jpg", "path": "/images/profiles/profile.jpg"},
+    "permissions": [],
+    "unit": {"id": 1, "cnae": "6201500"},
+}
+
+
+class FakeResponse:
+    """Stands in for `requests.Response`."""
+
+    def __init__(self, status_code=200, payload=None, text=""):
+        self.status_code = status_code
+        self._payload = payload
+        self.text = text or json.dumps(payload if payload is not None else {})
+
+    def json(self):
+        """Return the scripted JSON response body."""
+        if self._payload is None:
+            raise ValueError("no JSON body")
+        return self._payload
+
+
+class RecordingRequest:
+    """Captures every call `requests.request` would have made."""
+
+    def __init__(self, response=None, error=None):
+        self.response = response if response is not None else FakeResponse(payload={"ok": True})
+        self.error = error
+        self.calls = []
+
+    def __call__(self, method, url, **kwargs):
+        self.calls.append({"method": method, "url": url, **kwargs})
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+
+@pytest.fixture
+def profile_env(monkeypatch):
+    """Set test profile microservice environment variables."""
+    monkeypatch.setenv("PROFILE_MS_BASE_URL", "http://profile.test")
+    monkeypatch.setenv("MS_HTTP_TIMEOUT", "60")
+
+
+@pytest.fixture
+def recorded_request(monkeypatch, profile_env):
+    """Replace profile HTTP requests with a call recorder."""
+    from cmd.api.integrations import profile_api
+
+    request = RecordingRequest(FakeResponse(payload=PROFILE_PAYLOAD))
+    monkeypatch.setattr(profile_api.requests, "request", request)
+    return request
+
+
+def test_get_profile_uses_authentication_bearer_and_empty_body(recorded_request):
+    """Verify that get profile uses the Authentication header and an empty JSON body."""
+    from cmd.api.integrations import profile_api
+
+    profile_api.get_profile("ms-access")
+
+    call = recorded_request.calls[0]
+    assert call["method"] == "GET"
+    assert call["url"] == "http://profile.test/api/profile"
+    assert call["headers"]["Authentication"] == "Bearer ms-access"
+    assert "Authorization" not in call["headers"]
+    assert call["json"] == {}
+    assert call["timeout"] == 60.0
+
+
+def test_get_profile_returns_the_ms_payload_as_is(recorded_request):
+    """Verify that get profile returns the ms payload as is."""
+    from cmd.api.integrations import profile_api
+
+    assert profile_api.get_profile("ms-access") == PROFILE_PAYLOAD
+
+
+def test_profile_id_returns_the_positive_integer_id():
+    """Verify that profile id returns the positive integer id."""
+    from cmd.api.integrations.profile_api import profile_id
+
+    assert profile_id({"id": 1, "cpf": "12345678901"}) == 1
+    assert profile_id({"id": "12"}) == 12
+
+
+@pytest.mark.parametrize("payload", [{}, {"id": True}, {"id": 0}, {"id": -1}, {"id": "x"}])
+def test_profile_id_rejects_an_unusable_id(payload):
+    """Verify that profile id rejects an unusable id."""
+    from cmd.api.integrations.profile_api import profile_id
+
+    with pytest.raises(ValueError):
+        profile_id(payload)
+
+
+@pytest.mark.parametrize("env_var", ["PROFILE_MS_BASE_URL", "MS_HTTP_TIMEOUT"])
+def test_get_profile_raises_naming_a_missing_env_var(monkeypatch, profile_env, env_var):
+    """Verify that get profile raises naming a missing env var."""
+    monkeypatch.delenv(env_var, raising=False)
+    from cmd.api.integrations import profile_api
+
+    with pytest.raises(RuntimeError) as error:
+        profile_api.get_profile("ms-access")
+    assert env_var in str(error.value)
+
+
+@pytest.mark.parametrize("status_code", [401, 500])
+def test_get_profile_raises_on_http_error(monkeypatch, profile_env, status_code):
+    """Verify that get profile raises on http error."""
+    from cmd.api.integrations import profile_api
+
+    monkeypatch.setattr(
+        profile_api.requests,
+        "request",
+        RecordingRequest(FakeResponse(status_code=status_code, payload={"message": "denied"})),
+    )
+    with pytest.raises(profile_api.ProfileError):
+        profile_api.get_profile("ms-access")
+
+
+def test_get_profile_raises_on_transport_error(monkeypatch, profile_env):
+    """Verify that get profile raises on transport error."""
+    from cmd.api.integrations import profile_api
+
+    monkeypatch.setattr(
+        profile_api.requests,
+        "request",
+        RecordingRequest(error=requests.ConnectionError("down")),
+    )
+    with pytest.raises(profile_api.ProfileError):
+        profile_api.get_profile("ms-access")

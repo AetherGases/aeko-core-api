@@ -15,6 +15,7 @@ from pymongo import MongoClient
 from redis import Redis
 
 from a2a.service import Service as A2AService
+from cmd.api.acl.mcp_auth import wrap_mcp_auth
 from cmd.api.acl.mcp_server import build_mcp_server
 from cmd.api.integrations.climatiq_api import get_climatiq_tools
 from cmd.api.integrations.inventory_api import create_inventory
@@ -52,9 +53,12 @@ from improvement_plan.service import Service as ImprovementPlanService
 from internal.http.aeko_metrics_handlers import router as aeko_metrics_router
 from internal.http.hub_metrics_handlers import router as hub_metrics_router
 from internal.http.improvement_plan_handlers import router as improvement_plan_router
+from internal.http.oauth_handlers import router as oauth_router
 from internal.http.session_handlers import router as session_router
 from internal.http.upload_ticket_handlers import router as upload_ticket_router
 from internal.http.user_handlers import router as user_router
+from oauth.cache.repository import Repository as OAuthCodeRepository
+from oauth.service import Service as OAuthService
 from internal.shared import (
     Event,
     Module,
@@ -167,7 +171,7 @@ MCP_SESSIONS = (TAVILY_SESSION, CHROMA_SESSION)
 CHATGPT_MCP_PREFIX = "/aether-api/v1/mcp"
 
 chatgpt_mcp = build_mcp_server()
-chatgpt_mcp_app = chatgpt_mcp.streamable_http_app()
+chatgpt_mcp_app = wrap_mcp_auth(chatgpt_mcp.streamable_http_app())
 
 
 MCP_WARM_UP = os.getenv("AEKO_MCP_WARM_UP", "true")
@@ -408,6 +412,8 @@ async def lifespan(app: FastAPI):
         improvement_plans=ImprovementPlanService(ImprovementPlanRepository(db)),
     )
 
+    app.state.oauth = OAuthService(OAuthCodeRepository(redis_client))
+
     ticket_service = UploadTicketService(UploadTicketRepository(redis_client))
     configure_inventory_tools(
         tickets=ticket_service,
@@ -480,5 +486,6 @@ app.include_router(upload_ticket_router)
 app.include_router(improvement_plan_router)
 app.include_router(hub_metrics_router)
 app.include_router(aeko_metrics_router)
+app.include_router(oauth_router)
 
 app.mount(CHATGPT_MCP_PREFIX, chatgpt_mcp_app)

@@ -42,9 +42,11 @@ def get_improvement_plan_reasoning_query(id_external_inventory: int) -> tuple[di
     }
 
 
-def get_latest_improvement_plans_query() -> tuple[dict, dict]:
-    """Build an unscoped filter and list projection for the most recent plans."""
-    return {}, {
+def get_latest_improvement_plans_query(id_external_company: int) -> tuple[dict, dict]:
+    """Build a company-scoped filter and list projection for the most recent plans."""
+    return {
+        "id_external_company": id_external_company,
+    }, {
         "_id": 0,
         "id_external_inventory": 1,
         "defined_problem": 1,

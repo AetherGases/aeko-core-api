@@ -296,9 +296,6 @@ CHATGPT_TOOL_NAMES = {
     "get_latest_session_messages",
     "count_user_sessions",
     "query_gases_info",
-    "tavily_search",
-    "tavily_research",
-    "tavily_map",
     "climatiq_search",
     "climatiq_estimate",
     "calculator",
@@ -315,6 +312,16 @@ def test_chatgpt_catalog_equals_the_expected_names():
     from cmd.api.acl.catalog import get_chatgpt_tools
 
     assert {tool.name for tool in get_chatgpt_tools()} == CHATGPT_TOOL_NAMES
+
+
+def test_aeko_agents_still_receive_tavily(live_app, fake_sdk):
+    """Verify that aeko agents still receive tavily."""
+    for agent, tools in fake_sdk.RUNTIME.tools.items():
+        names = {tool.name for tool in tools}
+        if "tavily_search" in names or "tavily_research" in names or "tavily_map" in names:
+            assert {"tavily_search", "tavily_research", "tavily_map"} & names
+            return
+    raise AssertionError("no agent received Tavily tools")
 
 
 @pytest.mark.parametrize("agent", sorted(TOOLED_AGENTS))

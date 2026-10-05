@@ -27,9 +27,9 @@ class Service(IService):
         """Replace the plan stored for the same external inventory identifier."""
         return self.repository.replace(improvement_plan)
 
-    def list_latest(self, n: int) -> list[ImprovementPlan]:
-        """Retrieve the n most recently updated improvement plans."""
-        return self.repository.list_latest(n)
+    def list_latest(self, n: int, id_external_company: int) -> list[ImprovementPlan]:
+        """Retrieve the n most recently updated improvement plans for a company."""
+        return self.repository.list_latest(n, id_external_company)
 
     def input_inventory(
         self,

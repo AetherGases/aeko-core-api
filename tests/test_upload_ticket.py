@@ -120,3 +120,14 @@ def test_mark_consumed_rejects_waiting_state(service):
 
     with pytest.raises(ValueError):
         service.mark_consumed(42, created.ticket, 501)
+
+
+def test_record_created_inventory_appends_id(service):
+    """Append inventory ids created through ChatGPT ingest without a ticket."""
+    service.record_created_inventory(42, 501)
+
+    assert service.created_inventory_ids(42) == [501]
+
+    service.record_created_inventory(42, 502)
+
+    assert service.created_inventory_ids(42) == [501, 502]

@@ -48,6 +48,7 @@ def test_package_constants_have_one_definition_module(package):
         ("cmd/api/tools", "GET_IMPROVEMENT_PLAN_BY_INVENTORY_DESCRIPTION", "plan from env", "plan from env"),
         ("cmd/api/integrations/mcp", "DEFAULT_CALL_TIMEOUT", "17.5", 17.5),
         ("cmd/memory_generator_worker", "SESSION_INACTIVITY_MINUTES", "30", 30),
+        ("upload_ticket", "INVENTORY_UPLOAD_TICKET_TTL_SECONDS", "600", 600),
     ],
 )
 def test_constants_use_environment_overrides(monkeypatch, package, key, value, expected):

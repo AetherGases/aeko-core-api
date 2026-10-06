@@ -133,6 +133,12 @@ class FakeRedis:
         """Return the stored value for a key."""
         return self.values.get(key)
 
+    def getdel(self, key):
+        """Return the stored value for a key and remove it."""
+        value = self.values.pop(key, None)
+        self.expirations.pop(key, None)
+        return value
+
     def set(self, key, value, ex=None):
         """Store a value and optionally mark it for expiry simulation."""
         self.values[key] = value

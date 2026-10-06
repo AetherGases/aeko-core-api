@@ -23,7 +23,6 @@ from cmd.api.tools.constants import (
     GET_SESSION_MESSAGES_BY_NAME_DESCRIPTION,
     GET_LATEST_SESSION_MESSAGES_DESCRIPTION,
     COUNT_USER_SESSIONS_DESCRIPTION,
-    LIST_LATEST_USER_SESSION_NAMES_DESCRIPTION,
 )
 
 from improvement_plan.entity import ImprovementPlan
@@ -230,12 +229,23 @@ def _get_improvement_plan_reasoning(id_external_inventory: int) -> list[dict[str
     return _plan_by_inventory(id_external_inventory, ("id_external_inventory", "reasoning"))
 
 
-@logged(Module.TOOL, "list_latest_improvement_plans")
-def _list_latest_improvement_plans(n: int) -> list[dict[str, Any]]:
-    """Return the n most recently updated improvement plans."""
+def _company_id(user: User) -> int:
+    """Resolve the user's company, rejecting a missing or non-positive value."""
 
+    company = user.id_external_company
+    if company is None:
+        raise ValueError("id_external_company is required to search improvement plans.")
+    return _positive_int(company, "id_external_company")
+
+
+@logged(Module.TOOL, "list_latest_improvement_plans")
+def _list_latest_improvement_plans(id_external_user: int, n: int) -> list[dict[str, Any]]:
+    """Return the n most recently updated improvement plans for the user's company."""
+
+    user = _require_user(id_external_user)
+    company = _company_id(user)
     limit = _positive_int(n, "n")
-    documents = [_plan_catalog(plan) for plan in _plans().list_latest(limit)]
+    documents = [_plan_catalog(plan) for plan in _plans().list_latest(limit, company)]
     return _newest_first(documents, "updated_at")[:limit]
 
 
@@ -289,21 +299,6 @@ def _list_user_session_names(id_external_user: int) -> list[dict[str, Any]]:
 
     user = _require_user(id_external_user)
     return [{"name": session.name} for session in _user_sessions(user)]
-
-
-@logged(Module.TOOL, "list_latest_user_session_names")
-def _list_latest_user_session_names(id_external_user: int, n: int) -> list[dict[str, Any]]:
-    """Return the n most recently updated session names for an external user."""
-
-    identifier = _positive_int(id_external_user, "id_external_user")
-    limit = _positive_int(n, "n")
-    user = _require_user(identifier)
-    ordered = sorted(
-        _user_sessions(user),
-        key=lambda session: _timestamp(session.updated_at) or "",
-        reverse=True,
-    )
-    return [{"name": session.name} for session in ordered[:limit]]
 
 
 @logged(Module.TOOL, "get_session_messages_by_name")
@@ -429,11 +424,6 @@ def get_session_tools() -> list[Tool]:
             "list_user_session_names",
             LIST_USER_SESSION_NAMES_DESCRIPTION,
             _list_user_session_names,
-        ),
-        _typed_tool(
-            "list_latest_user_session_names",
-            LIST_LATEST_USER_SESSION_NAMES_DESCRIPTION,
-            _list_latest_user_session_names,
         ),
         _typed_tool(
             "get_session_messages_by_name",

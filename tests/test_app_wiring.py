@@ -61,13 +61,118 @@ def test_report_route_is_registered_on_the_application(api_main):
         "/aether-api/v1/ai/sessions/user/{id_user}",
         "/aether-api/v1/ai/session/{id_session}/messages",
         SEND_MESSAGE_ROUTE,
+        "/aether-api/v1/ai/user/{id_external_user}/inventory-upload/{ticket}/signature",
+        "/aether-api/v1/ai/user/{id_external_user}/inventory-upload/{ticket}/complete",
         REPORT_ROUTE,
         "/aether-api/v1/ai/report/{id_external_inventory}",
+        "/aether-api/v1/oauth/authorize",
+        "/aether-api/v1/oauth/token",
     ],
 )
 def test_every_documented_route_is_registered(api_main, path):
     """Verify that every documented route is registered."""
     assert path in api_main.app.openapi()["paths"]
+
+
+MCP_PREFIX = "/aether-api/v1/mcp"
+
+
+def registered_route_paths(app):
+    """Collect HTTP paths from the application, including nested included routers."""
+    paths = set()
+
+    def walk(routes):
+        """Record paths from a route list and walk included routers."""
+        for route in routes:
+            path = getattr(route, "path", None)
+            if path:
+                paths.add(path)
+            nested = getattr(route, "original_router", None)
+            if nested is not None:
+                walk(nested.routes)
+            elif hasattr(route, "routes"):
+                walk(route.routes)
+
+    walk(app.routes)
+    return paths
+
+
+def test_oauth_well_known_routes_are_registered(api_main):
+    """Verify that OAuth discovery routes are registered on the application."""
+    paths = registered_route_paths(api_main.app)
+
+    assert "/.well-known/oauth-authorization-server" in paths
+    assert "/.well-known/oauth-protected-resource" in paths
+
+
+def test_chatgpt_mcp_app_is_mounted_at_the_documented_prefix(api_main):
+    """Verify that the ChatGPT MCP app is mounted at the documented prefix."""
+    mounted = [route for route in api_main.app.routes if getattr(route, "path", None) == MCP_PREFIX]
+
+    assert len(mounted) == 1
+
+
+def test_chatgpt_mcp_mount_does_not_double_the_inner_path(api_main):
+    """Verify that the mounted MCP app serves at its root, not under another /mcp."""
+    (mounted,) = [route for route in api_main.app.routes if getattr(route, "path", None) == MCP_PREFIX]
+    inner_paths = {getattr(route, "path", None) for route in mounted.app.routes}
+
+    assert "/" in inner_paths
+    assert "/mcp" not in inner_paths
+
+
+def test_lifespan_configures_and_clears_the_chatgpt_tool_bindings(api_main):
+    """Verify that lifespan binds inventory and ask_aeko tools and clears them on shutdown."""
+    from cmd.api.tools import ask_aeko, inventory_tools
+
+    with TestClient(api_main.app) as client:
+        assert client.app.state.ticket_service is not None
+        assert client.app.state.oauth is not None
+        assert inventory_tools._tickets_service is client.app.state.ticket_service
+        assert inventory_tools._create_inventory is not None
+        assert inventory_tools._plans_service is not None
+        assert ask_aeko._a2a is not None
+        assert ask_aeko._aeko_messenger_factory is api_main.build_messenger
+        assert ask_aeko._aeko_session_factory is api_main.build_session
+
+    assert inventory_tools._tickets_service is None
+    assert inventory_tools._create_inventory is None
+    assert inventory_tools._plans_service is None
+    assert ask_aeko._a2a is None
+    assert ask_aeko._aeko_messenger_factory is None
+    assert ask_aeko._aeko_session_factory is None
+
+
+def test_chatgpt_mcp_accepts_initialize_on_a_public_host(api_main):
+    """Verify that the mounted MCP endpoint answers initialize for a non-localhost host."""
+    headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+    body = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {"name": "chatgpt", "version": "1"},
+        },
+    }
+
+    with TestClient(api_main.app, base_url="https://aeko.example.com") as client:
+        response = client.post(f"{MCP_PREFIX}/", headers=headers, json=body)
+
+    assert response.status_code == 200
+    assert response.status_code != 401
+    assert "www-authenticate" not in response.headers
+    assert "aeko-chatgpt" in response.text
+
+
+def test_chatgpt_mcp_session_manager_runs_inside_the_lifespan(api_main):
+    """Verify that the streamable HTTP session manager is running while the app is up."""
+    with TestClient(api_main.app):
+        manager = api_main.chatgpt_mcp.session_manager
+        assert manager._task_group is not None
+
+    assert manager._task_group is None
 
 
 def test_report_route_is_reachable(api_main):

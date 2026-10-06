@@ -278,6 +278,60 @@ def test_lifespan_registers_every_agent_in_a_single_call(live_app, fake_sdk):
     assert len(fake_sdk.RUNTIME.set_tools_calls) == 1
 
 
+CHATGPT_ONLY_TOOL_NAMES = {"ask_aeko", "analyze_inventory", "get_inventory_analysis"}
+
+CHATGPT_TOOL_NAMES = {
+    "get_improvement_plan_by_inventory",
+    "get_improvement_plan_problem",
+    "get_improvement_plan_method",
+    "get_improvement_plan_reasoning",
+    "list_latest_improvement_plans",
+    "query_improvement_plan_problems",
+    "get_user_profile_by_external_id",
+    "list_user_memory_fields",
+    "get_user_memory_by_field",
+    "list_user_memories",
+    "list_user_session_names",
+    "get_session_messages_by_name",
+    "get_latest_session_messages",
+    "count_user_sessions",
+    "query_gases_info",
+    "climatiq_search",
+    "climatiq_estimate",
+    "calculator",
+    "calculate_roi",
+    "calculate_payback",
+    "ask_aeko",
+    "analyze_inventory",
+    "get_inventory_analysis",
+}
+
+
+def test_chatgpt_catalog_equals_the_expected_names():
+    """Verify that the ChatGPT MCP catalog equals the expected tool names."""
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
+
+    assert {tool.name for tool in get_chatgpt_tools()} == CHATGPT_TOOL_NAMES
+
+
+def test_aeko_agents_still_receive_tavily(live_app, fake_sdk):
+    """Verify that aeko agents still receive tavily."""
+    for agent, tools in fake_sdk.RUNTIME.tools.items():
+        names = {tool.name for tool in tools}
+        if "tavily_search" in names or "tavily_research" in names or "tavily_map" in names:
+            assert {"tavily_search", "tavily_research", "tavily_map"} & names
+            return
+    raise AssertionError("no agent received Tavily tools")
+
+
+@pytest.mark.parametrize("agent", sorted(TOOLED_AGENTS))
+def test_no_agent_gets_the_chatgpt_only_tools(live_app, fake_sdk, agent):
+    """Verify that no Aeko agent can reach ask_aeko or the inventory ingest tools."""
+    tool_names = {tool.name for tool in fake_sdk.RUNTIME.tools[agent]}
+
+    assert tool_names.isdisjoint(CHATGPT_ONLY_TOOL_NAMES)
+
+
 CALCULATOR_TOOL_NAME = "calculator"
 
 IMPROVEMENT_PLAN_TOOL_NAMES = {
@@ -298,7 +352,6 @@ USER_MEMORY_TOOL_NAMES = {
 
 SESSION_TOOL_NAMES = {
     "list_user_session_names",
-    "list_latest_user_session_names",
     "get_session_messages_by_name",
     "get_latest_session_messages",
     "count_user_sessions",

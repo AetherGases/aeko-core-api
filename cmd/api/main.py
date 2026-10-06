@@ -14,13 +14,19 @@ from fastapi import FastAPI
 from pymongo import MongoClient
 from redis import Redis
 
+from cmd.api.integrations.a2a.service import Service as A2AService
+from cmd.api.acl.mcp_auth import wrap_mcp_auth
+from cmd.api.acl.open_ai.server import build_mcp_server
 from cmd.api.integrations.climatiq_api import get_climatiq_tools
+from cmd.api.integrations.inventory_api import create_inventory
 from cmd.api.integrations.mcp.chroma_mcp import (
     CHROMA_SESSION,
     configure as configure_chroma_tools,
     get_gases_info_tools,
     get_improvement_plan_problem_tools,
 )
+from cmd.api.tools.ask_aeko import configure as configure_ask_aeko
+from cmd.api.tools.inventory_tools import configure as configure_inventory_tools
 from cmd.api.tools.mongo_tools import (
     configure as configure_mongo_tools,
     get_improvement_plan_tools,
@@ -47,8 +53,12 @@ from improvement_plan.service import Service as ImprovementPlanService
 from internal.http.aeko_metrics_handlers import router as aeko_metrics_router
 from internal.http.hub_metrics_handlers import router as hub_metrics_router
 from internal.http.improvement_plan_handlers import router as improvement_plan_router
+from internal.http.oauth_handlers import router as oauth_router
 from internal.http.session_handlers import router as session_router
+from internal.http.upload_ticket_handlers import router as upload_ticket_router
 from internal.http.user_handlers import router as user_router
+from oauth.cache.repository import Repository as OAuthCodeRepository
+from oauth.service import Service as OAuthService
 from internal.shared import (
     Event,
     Module,
@@ -63,6 +73,8 @@ from session.cache.repository import Repository as SessionCacheRepository
 from session.database.repository import Repository as SessionRepository
 from session.service import Service as SessionService
 from session.session import GuardrailRejectedError
+from upload_ticket.cache.repository import Repository as UploadTicketRepository
+from upload_ticket.service import Service as UploadTicketService
 from user.database.repository import Repository as UserRepository
 from user.service import Service as UserService
 
@@ -155,6 +167,11 @@ AEKO_TOOLS = {
 
 
 MCP_SESSIONS = (TAVILY_SESSION, CHROMA_SESSION)
+
+CHATGPT_MCP_PREFIX = "/aether-api/v1/mcp"
+
+chatgpt_mcp = build_mcp_server()
+chatgpt_mcp_app = wrap_mcp_auth(chatgpt_mcp.streamable_http_app())
 
 
 MCP_WARM_UP = os.getenv("AEKO_MCP_WARM_UP", "true")
@@ -380,27 +397,46 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         raise RuntimeError(f"Failed to connect to Redis: {exc}") from exc
 
+    session_service = SessionService(
+        SessionRepository(db),
+        SessionCacheRepository(redis_client, scan_count=REDIS_SCAN_COUNT),
+        inactivity_minutes=SESSION_INACTIVITY_MINUTES,
+    )
     configure_mongo_tools(
         improvement_plans=ImprovementPlanService(ImprovementPlanRepository(db)),
         users=UserService(UserRepository(db)),
-        sessions=SessionService(
-            SessionRepository(db),
-            SessionCacheRepository(redis_client, scan_count=REDIS_SCAN_COUNT),
-            inactivity_minutes=SESSION_INACTIVITY_MINUTES,
-        ),
+        sessions=session_service,
     )
     configure_chroma_tools(
         users=UserService(UserRepository(db)),
         improvement_plans=ImprovementPlanService(ImprovementPlanRepository(db)),
     )
 
+    app.state.oauth = OAuthService(OAuthCodeRepository(redis_client))
+
+    ticket_service = UploadTicketService(UploadTicketRepository(redis_client))
+    configure_inventory_tools(
+        tickets=ticket_service,
+        create_inventory=create_inventory,
+        plans=ImprovementPlanService(ImprovementPlanRepository(db)),
+    )
+    configure_ask_aeko(
+        a2a=A2AService(UserService(UserRepository(db)), session_service, UserRepository(db)),
+        aeko_messenger_factory=build_messenger,
+        aeko_session_factory=build_session,
+    )
+    app.state.ticket_service = ticket_service
+
     if MCP_WARM_UP.strip().lower() not in {"false", "0", "no"}:
         _warm_up_mcp_sessions()
 
-    yield
+    async with chatgpt_mcp.session_manager.run():
+        yield
 
     configure_mongo_tools()
     configure_chroma_tools()
+    configure_inventory_tools()
+    configure_ask_aeko()
     set_event_sink(None)
     set_aeko_metrics_sink(None)
 
@@ -446,6 +482,10 @@ app.add_middleware(RequestLogMiddleware)
 
 app.include_router(user_router)
 app.include_router(session_router)
+app.include_router(upload_ticket_router)
 app.include_router(improvement_plan_router)
 app.include_router(hub_metrics_router)
 app.include_router(aeko_metrics_router)
+app.include_router(oauth_router)
+
+app.mount(CHATGPT_MCP_PREFIX, chatgpt_mcp_app)

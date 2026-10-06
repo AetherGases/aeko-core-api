@@ -13,7 +13,7 @@ SOURCES = sorted(
     path
     for directory in (
         "aeko_metrics", "cmd", "hub_metrics", "improvement_plan",
-        "internal", "session", "tests", "user",
+        "internal", "oauth", "session", "tests", "upload_ticket", "user",
     )
     for path in (ROOT / directory).rglob("*.py")
 )

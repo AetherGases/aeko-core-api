@@ -30,3 +30,7 @@ AGENT_DOCS/
 .coverage
 htmlcov/
 .pytest_cache/
+
+
+.superpowers/*
+specs/*

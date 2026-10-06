@@ -46,10 +46,10 @@ class Repository(IRepository):
             raise RuntimeError(f"Error replacing improvement plan in database: {e}")
 
     @logged(Module.DATABASE, "improvement_plan.list_latest")
-    def list_latest(self, n: int) -> list[ImprovementPlan]:
-        """Retrieve the n most recently updated improvement plans."""
+    def list_latest(self, n: int, id_external_company: int) -> list[ImprovementPlan]:
+        """Retrieve the n most recently updated improvement plans for a company."""
         try:
-            query, projection = q.get_latest_improvement_plans_query()
+            query, projection = q.get_latest_improvement_plans_query(id_external_company)
             documents = self.db["improvement_plan"].find(
                 query,
                 projection,

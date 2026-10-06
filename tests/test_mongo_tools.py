@@ -44,7 +44,6 @@ USER_MEMORY_TOOL_DESCRIPTIONS = {
 
 SESSION_TOOL_DESCRIPTIONS = {
     "list_user_session_names": "LIST_USER_SESSION_NAMES_DESCRIPTION",
-    "list_latest_user_session_names": "LIST_LATEST_USER_SESSION_NAMES_DESCRIPTION",
     "get_session_messages_by_name": "GET_SESSION_MESSAGES_BY_NAME_DESCRIPTION",
     "get_latest_session_messages": "GET_LATEST_SESSION_MESSAGES_DESCRIPTION",
     "count_user_sessions": "COUNT_USER_SESSIONS_DESCRIPTION",
@@ -52,7 +51,6 @@ SESSION_TOOL_DESCRIPTIONS = {
 
 SESSION_TOOL_NAMES = {
     "list_user_session_names",
-    "list_latest_user_session_names",
     "get_session_messages_by_name",
     "get_latest_session_messages",
     "count_user_sessions",
@@ -60,6 +58,13 @@ SESSION_TOOL_NAMES = {
 
 USER_ID = "65a8b3d6c0f8e1d7f4b2c010"
 USER = User(id=USER_ID, id_external_user=12345, role="analyst", usecase="report_generation")
+COMPANY_USER = User(
+    id=USER_ID,
+    id_external_user=12345,
+    role="analyst",
+    usecase="report_generation",
+    id_external_company=90,
+)
 PLAN = ImprovementPlan(
     id="plan-1",
     id_external_inventory=42,
@@ -105,9 +110,9 @@ class StubPlanService:
             raise ValueError(f"Improvement plan with id_external_inventory {identifier} not found.")
         return self.plan
 
-    def list_latest(self, n):
+    def list_latest(self, n, id_external_company):
         """Record a latest-plan listing and return the scripted plans."""
-        self.calls.append(("list_latest", n))
+        self.calls.append(("list_latest", n, id_external_company))
         if self.error is not None:
             raise self.error
         return list(self.plans)
@@ -286,23 +291,53 @@ def test_list_latest_improvement_plans_asks_the_service_for_n_and_sorts_newest_f
         updated_at="2026-09-01T00:00:00Z",
     )
     plans = StubPlanService(plans=[older, newer])
-    bind(plans=plans)
+    bind(plans=plans, users=StubUserService(user=COMPANY_USER))
 
-    result = mongo_tools._list_latest_improvement_plans(2)
+    result = mongo_tools._list_latest_improvement_plans(12345, 2)
 
     assert [item["id_external_inventory"] for item in result] == [43, 41]
     assert all("_id" not in item for item in result)
-    assert plans.calls == [("list_latest", 2)]
+    assert plans.calls == [("list_latest", 2, 90)]
+
+
+def test_list_latest_improvement_plans_asks_the_service_for_n_and_the_user_company():
+    """Verify that list latest asks the service for n and the user company."""
+    own = ImprovementPlan(
+        id="plan-new",
+        id_external_inventory=43,
+        id_external_company=90,
+        defined_problem="flaring",
+        updated_at="2026-09-01T00:00:00Z",
+    )
+    plans = StubPlanService(plans=[own])
+    bind(plans=plans, users=StubUserService(user=COMPANY_USER))
+
+    result = mongo_tools._list_latest_improvement_plans(12345, 2)
+
+    assert [item["id_external_inventory"] for item in result] == [43]
+    assert all("_id" not in item and "id_external_company" not in item for item in result)
+    assert plans.calls == [("list_latest", 2, 90)]
+
+
+def test_list_latest_improvement_plans_rejects_a_user_without_company():
+    """Verify that list latest rejects a user without company."""
+    plans = StubPlanService(plans=[PLAN])
+    bind(plans=plans, users=StubUserService(user=USER))
+
+    with pytest.raises(ValueError, match="id_external_company"):
+        mongo_tools._list_latest_improvement_plans(12345, 3)
+
+    assert plans.calls == []
 
 
 def test_list_latest_improvement_plans_accepts_a_numeric_string():
     """Verify that list latest improvement plans accepts a numeric string."""
     plans = StubPlanService(plans=[PLAN])
-    bind(plans=plans)
+    bind(plans=plans, users=StubUserService(user=COMPANY_USER))
 
-    mongo_tools._list_latest_improvement_plans("3")
+    mongo_tools._list_latest_improvement_plans(12345, "3")
 
-    assert plans.calls == [("list_latest", 3)]
+    assert plans.calls == [("list_latest", 3, 90)]
 
 
 def test_list_latest_improvement_plans_does_not_cap_at_twenty():
@@ -311,28 +346,28 @@ def test_list_latest_improvement_plans_does_not_cap_at_twenty():
         ImprovementPlan(id=f"plan-{index}", id_external_inventory=index, updated_at=f"2026-01-{index + 1:02d}T00:00:00Z")
         for index in range(25)
     ]
-    bind(plans=StubPlanService(plans=plans))
+    bind(plans=StubPlanService(plans=plans), users=StubUserService(user=COMPANY_USER))
 
-    result = mongo_tools._list_latest_improvement_plans(25)
+    result = mongo_tools._list_latest_improvement_plans(12345, 25)
 
     assert len(result) == 25
 
 
 def test_list_latest_improvement_plans_returns_an_empty_list_when_nothing_matches():
     """Verify that list latest improvement plans returns an empty list when nothing matches."""
-    bind(plans=StubPlanService(plans=[]))
+    bind(plans=StubPlanService(plans=[]), users=StubUserService(user=COMPANY_USER))
 
-    assert mongo_tools._list_latest_improvement_plans(3) == []
+    assert mongo_tools._list_latest_improvement_plans(12345, 3) == []
 
 
 @pytest.mark.parametrize("bad", [None, "", "   ", "abc", 0, -1, True, False, 4.2])
 def test_list_latest_improvement_plans_rejects_an_unusable_limit(bad):
     """Verify that list latest improvement plans rejects an unusable limit."""
     plans = StubPlanService(plans=[PLAN])
-    bind(plans=plans)
+    bind(plans=plans, users=StubUserService(user=COMPANY_USER))
 
     with pytest.raises(ValueError):
-        mongo_tools._list_latest_improvement_plans(bad)
+        mongo_tools._list_latest_improvement_plans(12345, bad)
 
     assert plans.calls == []
 
@@ -430,98 +465,6 @@ def test_list_user_session_names_returns_an_empty_list_when_the_user_has_none():
     bind(users=StubUserService(user=USER), sessions=StubSessionService(empty=True))
 
     assert mongo_tools._list_user_session_names(12345) == []
-
-
-def test_list_latest_user_session_names_returns_the_newest_n_names():
-    """Verify that list latest user session names returns the newest n names."""
-    older = Session(
-        id="s-old",
-        id_user=USER_ID,
-        name="older chat",
-        messages=[],
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    newer = Session(
-        id="s-new",
-        id_user=USER_ID,
-        name="newer chat",
-        messages=[],
-        updated_at="2026-09-01T00:00:00Z",
-    )
-    middle = Session(
-        id="s-mid",
-        id_user=USER_ID,
-        name="middle chat",
-        messages=[],
-        updated_at="2026-06-01T00:00:00Z",
-    )
-    bind(
-        users=StubUserService(user=USER),
-        sessions=StubSessionService(sessions=[older, newer, middle]),
-    )
-
-    result = mongo_tools._list_latest_user_session_names(12345, 2)
-
-    assert result == [{"name": "newer chat"}, {"name": "middle chat"}]
-
-
-def test_list_latest_user_session_names_puts_sessions_without_updated_at_last():
-    """Verify that list latest user session names puts sessions without updated at last."""
-    stamped = Session(
-        id="s-new",
-        id_user=USER_ID,
-        name="stamped",
-        messages=[],
-        updated_at="2026-09-01T00:00:00Z",
-    )
-    missing = Session(id="s-old", id_user=USER_ID, name="unstamped", messages=[])
-    bind(
-        users=StubUserService(user=USER),
-        sessions=StubSessionService(sessions=[missing, stamped]),
-    )
-
-    result = mongo_tools._list_latest_user_session_names(12345, 2)
-
-    assert result == [{"name": "stamped"}, {"name": "unstamped"}]
-
-
-def test_list_latest_user_session_names_returns_fewer_when_the_user_has_fewer():
-    """Verify that list latest user session names returns fewer when the user has fewer."""
-    bind(users=StubUserService(user=USER), sessions=StubSessionService(sessions=[SESSION]))
-
-    result = mongo_tools._list_latest_user_session_names(12345, 5)
-
-    assert result == [{"name": "Weekly emissions review"}]
-
-
-def test_list_latest_user_session_names_returns_an_empty_list_when_the_user_has_none():
-    """Verify that list latest user session names returns an empty list when the user has none."""
-    bind(users=StubUserService(user=USER), sessions=StubSessionService(empty=True))
-
-    assert mongo_tools._list_latest_user_session_names(12345, 3) == []
-
-
-def test_list_latest_user_session_names_accepts_a_numeric_string():
-    """Verify that list latest user session names accepts a numeric string."""
-    bind(users=StubUserService(user=USER), sessions=StubSessionService(sessions=[SESSION]))
-
-    result = mongo_tools._list_latest_user_session_names("12345", "1")
-
-    assert result == [{"name": "Weekly emissions review"}]
-
-
-@pytest.mark.parametrize("bad", [None, "", "   ", "abc", 0, -1, True, False, 4.2])
-def test_list_latest_user_session_names_rejects_an_unusable_limit(bad):
-    """Verify that list latest user session names rejects an unusable limit."""
-    users = StubUserService(user=USER)
-    sessions = StubSessionService(sessions=[SESSION])
-    bind(users=users, sessions=sessions)
-
-    with pytest.raises(ValueError):
-        mongo_tools._list_latest_user_session_names(12345, bad)
-
-    assert users.calls == []
-    assert sessions.calls == []
 
 
 def test_get_session_messages_by_name_reads_messages_from_the_named_session():
@@ -661,15 +604,14 @@ def test_get_improvement_plan_by_inventory_tool_declares_the_inventory_argument(
     assert set(tool.args) == {"id_external_inventory"}
 
 
-def test_list_latest_improvement_plans_tool_declares_n():
-    """Verify that list latest improvement plans tool declares n."""
+def test_list_latest_improvement_plans_tool_declares_user_and_n():
+    """Verify that list latest improvement plans tool declares user and n."""
     tool = next(
         item
         for item in mongo_tools.get_improvement_plan_tools()
         if item.name == "list_latest_improvement_plans"
     )
-
-    assert set(tool.args) == {"n"}
+    assert set(tool.args) == {"id_external_user", "n"}
 
 
 def test_get_user_memory_tools_exposes_the_typed_user_catalog():
@@ -711,17 +653,6 @@ def test_session_tools_load_descriptions_from_the_environment():
     tools = {tool.name: tool for tool in mongo_tools.get_session_tools()}
     for name, constant in SESSION_TOOL_DESCRIPTIONS.items():
         assert tools[name].description == getattr(tool_constants, constant)
-
-
-def test_list_latest_user_session_names_tool_declares_external_user_and_n():
-    """Verify that list latest user session names tool declares external user and n."""
-    tool = next(
-        item
-        for item in mongo_tools.get_session_tools()
-        if item.name == "list_latest_user_session_names"
-    )
-
-    assert set(tool.args) == {"id_external_user", "n"}
 
 
 def test_get_session_messages_by_name_tool_declares_external_user_and_session_name():

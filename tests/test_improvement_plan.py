@@ -92,9 +92,9 @@ class StubPlanRepository:
         self.existing = improvement_plan
         return improvement_plan
 
-    def list_latest(self, n):
-        """Retrieve the n most recently updated improvement plans."""
-        self.calls.append(("list_latest", n))
+    def list_latest(self, n, id_external_company):
+        """Retrieve the n most recently updated improvement plans for a company."""
+        self.calls.append(("list_latest", n, id_external_company))
         return self.result if self.result is not None else []
 
 
@@ -418,15 +418,14 @@ def test_replace_wraps_database_failures():
         repository.replace(ImprovementPlan(id_external_inventory=1))
 
 
-def test_list_latest_sorts_and_limits_in_the_find():
-    """Verify that list latest sorts and limits in the find."""
+def test_list_latest_sorts_limits_and_filters_in_the_find():
+    """Verify that list latest sorts limits and filters in the find."""
     repository, collection = build_repository(StubCollection(find_result=[PLAN_DOCUMENT]))
 
-    plans = repository.list_latest(3)
+    plans = repository.list_latest(3, 90)
 
     query, projection = collection.call_args("find")[0]
-    assert query == {}
-    assert projection["_id"] == 0
+    assert query == {"id_external_company": 90}
     assert collection.find_options[0]["sort"] == [("updated_at", -1)]
     assert collection.find_options[0]["limit"] == 3
     assert plans[0].id == "65a8b3d6c0f8e1d7f4b2c020"
@@ -436,7 +435,7 @@ def test_list_latest_returns_an_empty_list():
     """Verify that list latest returns an empty list."""
     repository, _ = build_repository(StubCollection(find_result=[]))
 
-    assert repository.list_latest(3) == []
+    assert repository.list_latest(3, 90) == []
 
 
 def test_list_latest_wraps_database_failures():
@@ -444,7 +443,7 @@ def test_list_latest_wraps_database_failures():
     repository, _ = build_repository(StubCollection(error=OSError("boom")))
 
     with pytest.raises(RuntimeError, match="boom"):
-        repository.list_latest(3)
+        repository.list_latest(3, 90)
 
 
 def test_improvement_plan_from_data_handles_a_document_without_an_identifier():
@@ -493,11 +492,11 @@ def test_regex_plan_search_is_gone():
     assert not hasattr(Service, "search_by_method")
 
 
-def test_get_latest_improvement_plans_query_lists_catalog_fields_without_id():
-    """Verify that get latest improvement plans query lists catalog fields without id."""
-    query, projection = q.get_latest_improvement_plans_query()
+def test_get_latest_improvement_plans_query_filters_by_company():
+    """Verify that get latest improvement plans query filters by company."""
+    query, projection = q.get_latest_improvement_plans_query(90)
 
-    assert query == {}
+    assert query == {"id_external_company": 90}
     assert projection == {
         "_id": 0,
         "id_external_inventory": 1,
@@ -595,13 +594,13 @@ def test_service_replace_delegates_to_the_repository():
     assert repository.calls == [("replace", plan)]
 
 
-def test_service_list_latest_delegates_to_the_repository():
-    """Verify that service list latest delegates to the repository."""
+def test_service_list_latest_delegates_n_and_company_to_the_repository():
+    """Verify that service list latest delegates n and company to the repository."""
     plans = [ImprovementPlan(id="p1")]
     repository = StubPlanRepository(result=plans)
 
-    assert build_service(repository).list_latest(3) is plans
-    assert repository.calls == [("list_latest", 3)]
+    assert build_service(repository).list_latest(3, 90) is plans
+    assert repository.calls == [("list_latest", 3, 90)]
 
 
 def test_analyze_receives_the_inventory_as_markdown():

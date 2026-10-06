@@ -2,7 +2,7 @@
 
 from langchain_core.tools import Tool, create_schema_from_function
 
-from a2a.entity import (
+from cmd.api.integrations.a2a.entity import (
     A2AMessage,
     A2A_RECIPIENT_AEKO,
     A2A_SENDER_CHATGPT,

@@ -14,9 +14,9 @@ from fastapi import FastAPI
 from pymongo import MongoClient
 from redis import Redis
 
-from a2a.service import Service as A2AService
+from cmd.api.integrations.a2a.service import Service as A2AService
 from cmd.api.acl.mcp_auth import wrap_mcp_auth
-from cmd.api.acl.mcp_server import build_mcp_server
+from cmd.api.acl.open_ai.server import build_mcp_server
 from cmd.api.integrations.climatiq_api import get_climatiq_tools
 from cmd.api.integrations.inventory_api import create_inventory
 from cmd.api.integrations.mcp.chroma_mcp import (

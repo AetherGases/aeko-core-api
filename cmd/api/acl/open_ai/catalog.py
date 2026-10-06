@@ -7,7 +7,7 @@ Tavily stays on Aeko agents and is omitted here.
 
 from langchain_core.tools import Tool
 
-from cmd.api.acl.wrappers import wrap_chatgpt_tools
+from cmd.api.acl.open_ai.wrappers import wrap_chatgpt_tools
 from cmd.api.integrations.climatiq_api import get_climatiq_tools
 from cmd.api.integrations.mcp.chroma_mcp import (
     get_gases_info_tools,

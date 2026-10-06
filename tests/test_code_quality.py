@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCES = sorted(
     path
     for directory in (
-        "a2a", "aeko_metrics", "cmd", "hub_metrics", "improvement_plan",
+        "aeko_metrics", "cmd", "hub_metrics", "improvement_plan",
         "internal", "oauth", "session", "tests", "upload_ticket", "user",
     )
     for path in (ROOT / directory).rglob("*.py")

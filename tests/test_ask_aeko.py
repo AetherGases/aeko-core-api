@@ -3,7 +3,8 @@
 import pytest
 from langchain_core.tools import Tool
 
-from a2a.entity import A2A_RECIPIENT_AEKO, A2A_SENDER_CHATGPT
+from cmd.api.integrations.a2a.entity import A2AMessage, A2A_RECIPIENT_AEKO, A2A_SENDER_CHATGPT
+from cmd.api.integrations.a2a.service import Service
 from cmd.api.tools import ask_aeko as ask_aeko_tools
 from cmd.api.tools import constants as tool_constants
 from session.session import GuardrailRejectedError

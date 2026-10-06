@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from a2a.entity import A2AMessage
+from cmd.api.integrations.a2a.entity import A2AMessage
 
 
 class IService(ABC):

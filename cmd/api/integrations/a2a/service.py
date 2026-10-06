@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from a2a.a2a import IService
-from a2a.entity import A2AMessage
+from cmd.api.integrations.a2a.a2a import IService
+from cmd.api.integrations.a2a.entity import A2AMessage
 from user.user import IRepository as IUserRepository
 
 

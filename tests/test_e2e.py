@@ -309,7 +309,7 @@ CHATGPT_TOOL_NAMES = {
 
 def test_chatgpt_catalog_equals_the_expected_names():
     """Verify that the ChatGPT MCP catalog equals the expected tool names."""
-    from cmd.api.acl.catalog import get_chatgpt_tools
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
 
     assert {tool.name for tool in get_chatgpt_tools()} == CHATGPT_TOOL_NAMES
 

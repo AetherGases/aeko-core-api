@@ -5,7 +5,7 @@ INVENTORY_WIDGET_URI = "ui://widget/analyze-inventory.html"
 
 def tool_meta(name: str) -> dict:
     """Return FastMCP tool metadata ChatGPT uses for Sign in and widgets."""
-    from cmd.api.acl.catalog import AUTHENTICATED_CHATGPT_TOOL_NAMES
+    from cmd.api.acl.open_ai.catalog import AUTHENTICATED_CHATGPT_TOOL_NAMES
 
     if name in AUTHENTICATED_CHATGPT_TOOL_NAMES:
         schemes = [{"type": "oauth2", "scopes": ["mcp"]}]

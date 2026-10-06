@@ -11,7 +11,7 @@ import requests
 from langchain_core.tools import Tool, create_schema_from_function
 from pydantic import BaseModel
 
-from cmd.api.acl.identity import current_id_external_user
+from cmd.api.acl.open_ai.identity import current_id_external_user
 from cmd.api.integrations.cloudinary_api import CloudinaryError, get_upload_signature
 from cmd.api.integrations.cloudinary_upload import upload_signed_file
 from cmd.api.integrations.inventory_api import InventoryError

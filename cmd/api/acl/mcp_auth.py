@@ -2,8 +2,8 @@
 
 import json
 
-from cmd.api.acl.catalog import AUTHENTICATED_CHATGPT_TOOL_NAMES
-from cmd.api.acl.identity import (
+from cmd.api.acl.open_ai.catalog import AUTHENTICATED_CHATGPT_TOOL_NAMES
+from cmd.api.acl.open_ai.identity import (
     attach_id_external_user,
     bind_id_external_user,
     reset_id_external_user,

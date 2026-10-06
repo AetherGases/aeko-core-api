@@ -1,7 +1,7 @@
 """Verify the ChatGPT MCP tool catalog and FastMCP server definition."""
 
-from cmd.api.acl.catalog import chatgpt_tool_names, get_chatgpt_tools
-from cmd.api.acl.mcp_server import build_mcp_server, mcp
+from cmd.api.acl.open_ai.catalog import chatgpt_tool_names, get_chatgpt_tools
+from cmd.api.acl.open_ai.server import build_mcp_server, mcp
 
 EXPECTED = {
     "get_improvement_plan_by_inventory",
@@ -63,8 +63,8 @@ def test_fastmcp_server_is_named_aeko_chatgpt():
 
 def test_fastmcp_server_registers_every_catalog_tool():
     """Verify that the FastMCP server registers exactly the catalog tools."""
-    from cmd.api.acl.mcp_server import build_mcp_server
-    from cmd.api.acl.catalog import chatgpt_tool_names
+    from cmd.api.acl.open_ai.server import build_mcp_server
+    from cmd.api.acl.open_ai.catalog import chatgpt_tool_names
 
     registered = {tool.name for tool in build_mcp_server()._tool_manager.list_tools()}
     assert registered == chatgpt_tool_names()
@@ -103,7 +103,7 @@ def test_fastmcp_runs_a_slow_sync_tool_without_blocking_the_event_loop(monkeypat
     from fastapi import FastAPI
     from langchain_core.tools import Tool
 
-    from cmd.api.acl import mcp_server
+    from cmd.api.acl.open_ai import server as mcp_server
 
     release = threading.Event()
 
@@ -206,8 +206,8 @@ def test_fastmcp_tools_keep_the_catalog_descriptions():
 
 def test_authenticated_chatgpt_tools_declare_oauth2_security_schemes():
     """Verify that authenticated chatgpt tools declare oauth2 security schemes."""
-    from cmd.api.acl.catalog import AUTHENTICATED_CHATGPT_TOOL_NAMES
-    from cmd.api.acl.mcp_server import build_mcp_server
+    from cmd.api.acl.open_ai.catalog import AUTHENTICATED_CHATGPT_TOOL_NAMES
+    from cmd.api.acl.open_ai.server import build_mcp_server
 
     for registered in build_mcp_server()._tool_manager.list_tools():
         meta = registered.meta or {}
@@ -216,3 +216,13 @@ def test_authenticated_chatgpt_tools_declare_oauth2_security_schemes():
             assert schemes == [{"type": "oauth2", "scopes": ["mcp"]}]
         else:
             assert schemes == [{"type": "noauth"}]
+
+
+def test_generic_mcp_server_module_does_not_build_chatgpt():
+    """Verify that generic mcp helpers do not import the ChatGPT adapter."""
+    import cmd.api.acl.mcp_server as mcp_server
+
+    assert hasattr(mcp_server, "expose_function")
+    assert hasattr(mcp_server, "run_in_worker_thread")
+    assert not hasattr(mcp_server, "build_mcp_server")
+    assert not hasattr(mcp_server, "mcp")

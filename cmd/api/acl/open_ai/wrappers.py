@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 from langchain_core.tools import Tool, create_schema_from_function
 
-from cmd.api.acl.identity import current_id_external_user
+from cmd.api.acl.open_ai.identity import current_id_external_user
 
 _COMPANY_CHECKED_PLAN_TOOLS = {
     "get_improvement_plan_by_inventory",
@@ -84,7 +84,7 @@ def _chatgpt_function(
 def _wrap_chatgpt_tool(tool: Tool) -> Tool:
     """Wrap one catalog tool for ChatGPT, leaving anonymous tools unchanged."""
 
-    from cmd.api.acl.catalog import ANONYMOUS_CHATGPT_TOOL_NAMES
+    from cmd.api.acl.open_ai.catalog import ANONYMOUS_CHATGPT_TOOL_NAMES
     from cmd.api.tools.constants import CHATGPT_ANALYZE_INVENTORY_DESCRIPTION
     from cmd.api.tools.inventory_tools import _analyze_inventory_chatgpt
 

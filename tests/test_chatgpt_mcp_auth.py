@@ -93,7 +93,7 @@ def www_authenticate_list(body):
 def make_client():
     """Build an isolated FastAPI app that only serves the wrapped ChatGPT MCP."""
     from cmd.api.acl.mcp_auth import wrap_mcp_auth
-    from cmd.api.acl.mcp_server import build_mcp_server
+    from cmd.api.acl.open_ai.server import build_mcp_server
 
     mcp = build_mcp_server()
     wrapped = wrap_mcp_auth(mcp.streamable_http_app())
@@ -292,7 +292,7 @@ def test_valid_token_on_ask_aeko_binds_identity_and_is_not_unauthorized(
     oauth_env, monkeypatch
 ):
     """Verify that a valid access token binds the ChatGPT user and does not 401."""
-    from cmd.api.acl.identity import current_id_external_user
+    from cmd.api.acl.open_ai.identity import current_id_external_user
     from cmd.api.tools import ask_aeko as ask_module
     from oauth.token import encode_access_token
 
@@ -337,7 +337,7 @@ def test_valid_token_on_ask_aeko_binds_identity_and_is_not_unauthorized(
 
 def test_attach_id_external_user_keeps_non_dict_scope_state_attributes():
     """Verify that attach writes identity without replacing a non-dict scope state."""
-    from cmd.api.acl.identity import attach_id_external_user
+    from cmd.api.acl.open_ai.identity import attach_id_external_user
 
     class ScopeState:
         def __init__(self):

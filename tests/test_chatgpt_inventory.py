@@ -212,8 +212,8 @@ def test_ingest_chatgpt_inventory_hides_microservice_details(monkeypatch, servic
 
 def test_chatgpt_analyze_inventory_fetches_download_url_and_hides_it(monkeypatch):
     """Verify that chatgpt analyze inventory fetches download_url and hides it."""
-    from cmd.api.acl import identity
-    from cmd.api.acl.catalog import get_chatgpt_tools
+    from cmd.api.acl.open_ai import identity
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
     from cmd.api.tools import inventory_tools
 
     downloaded = []
@@ -398,8 +398,8 @@ def test_fetch_chatgpt_file_maps_http_errors_without_leaking_the_url(monkeypatch
 
 def test_chatgpt_catalog_analyze_inventory_uses_host_file_schema():
     """Verify that chatgpt catalog analyze inventory uses host file schema."""
-    from cmd.api.acl.catalog import get_chatgpt_tools
-    from cmd.api.acl.mcp_server import build_mcp_server
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
+    from cmd.api.acl.open_ai.server import build_mcp_server
 
     tool = next(item for item in get_chatgpt_tools() if item.name == "analyze_inventory")
     assert set(tool.args) == {"name", "fileType", "file"}
@@ -426,8 +426,8 @@ def test_chatgpt_catalog_analyze_inventory_uses_host_file_schema():
 
 def test_chatgpt_inventory_descriptions_omit_aether_tickets():
     """Verify that chatgpt inventory descriptions omit aether tickets."""
-    from cmd.api.acl.catalog import get_chatgpt_tools
-    from cmd.api.acl.mcp_server import build_mcp_server
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
+    from cmd.api.acl.open_ai.server import build_mcp_server
 
     descriptions = {tool.name: tool.description for tool in get_chatgpt_tools()}
     registered = {
@@ -449,8 +449,8 @@ def test_chatgpt_inventory_descriptions_omit_aether_tickets():
 
 def test_record_created_inventory_allows_get_inventory_analysis(services):
     """Verify that record created inventory allows get inventory analysis."""
-    from cmd.api.acl import identity
-    from cmd.api.acl.catalog import get_chatgpt_tools
+    from cmd.api.acl.open_ai import identity
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
     from improvement_plan.entity import ImprovementPlan
 
     tickets, _ = services

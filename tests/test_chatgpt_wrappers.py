@@ -2,12 +2,12 @@
 
 import pytest
 
-from cmd.api.acl.catalog import get_chatgpt_tools
+from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
 
 
 def test_chatgpt_list_latest_schema_has_only_n():
     """Verify that chatgpt list latest schema has only n."""
-    from cmd.api.acl.catalog import get_chatgpt_tools
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
 
     tool = next(t for t in get_chatgpt_tools() if t.name == "list_latest_improvement_plans")
     assert set(tool.args) == {"n"}
@@ -28,8 +28,8 @@ def test_chatgpt_query_plan_problems_schema_has_only_query():
 
 def test_chatgpt_list_latest_injects_the_bound_user(monkeypatch):
     """Verify that chatgpt list latest injects the bound user."""
-    from cmd.api.acl import identity
-    from cmd.api.acl.catalog import get_chatgpt_tools
+    from cmd.api.acl.open_ai import identity
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
     from cmd.api.tools import mongo_tools
 
     received = []
@@ -51,8 +51,8 @@ def test_chatgpt_list_latest_injects_the_bound_user(monkeypatch):
 
 def test_chatgpt_get_plan_hides_another_company(monkeypatch):
     """Verify that chatgpt get plan hides another company."""
-    from cmd.api.acl import identity
-    from cmd.api.acl.catalog import get_chatgpt_tools
+    from cmd.api.acl.open_ai import identity
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
     from cmd.api.tools import mongo_tools
     from improvement_plan.entity import ImprovementPlan
     from user.entity import User
@@ -89,8 +89,8 @@ def test_chatgpt_get_plan_hides_another_company(monkeypatch):
 
 def test_chatgpt_get_plan_returns_the_same_catalog_for_the_same_company(monkeypatch):
     """Verify that chatgpt get plan returns the same catalog for the same company."""
-    from cmd.api.acl import identity
-    from cmd.api.acl.catalog import get_chatgpt_tools
+    from cmd.api.acl.open_ai import identity
+    from cmd.api.acl.open_ai.catalog import get_chatgpt_tools
     from cmd.api.tools import mongo_tools
     from improvement_plan.entity import ImprovementPlan
     from user.entity import User

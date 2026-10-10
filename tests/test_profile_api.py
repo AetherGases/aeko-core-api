@@ -1,4 +1,4 @@
-"""Verify profile microservice client behavior and error handling."""
+"""Verify ms-auth profile client behavior and error handling."""
 
 import json
 
@@ -49,8 +49,8 @@ class RecordingRequest:
 
 @pytest.fixture
 def profile_env(monkeypatch):
-    """Set test profile microservice environment variables."""
-    monkeypatch.setenv("PROFILE_MS_BASE_URL", "http://profile.test")
+    """Set test auth microservice environment variables for profile calls."""
+    monkeypatch.setenv("AUTH_MS_BASE_URL", "http://auth.test")
     monkeypatch.setenv("MS_HTTP_TIMEOUT", "60")
 
 
@@ -64,17 +64,17 @@ def recorded_request(monkeypatch, profile_env):
     return request
 
 
-def test_get_profile_uses_authentication_bearer_and_empty_body(recorded_request):
-    """Verify that get profile uses the Authentication header and an empty JSON body."""
+def test_get_profile_uses_authorization_bearer_and_empty_body(recorded_request):
+    """Verify that get profile uses the Authorization header and an empty JSON body."""
     from cmd.api.integrations import profile_api
 
     profile_api.get_profile("ms-access")
 
     call = recorded_request.calls[0]
     assert call["method"] == "GET"
-    assert call["url"] == "http://profile.test/api/profile"
-    assert call["headers"]["Authentication"] == "Bearer ms-access"
-    assert "Authorization" not in call["headers"]
+    assert call["url"] == "http://auth.test/api/profile"
+    assert call["headers"]["Authorization"] == "Bearer ms-access"
+    assert "Authentication" not in call["headers"]
     assert call["json"] == {}
     assert call["timeout"] == 60.0
 
@@ -103,7 +103,7 @@ def test_profile_id_rejects_an_unusable_id(payload):
         profile_id(payload)
 
 
-@pytest.mark.parametrize("env_var", ["PROFILE_MS_BASE_URL", "MS_HTTP_TIMEOUT"])
+@pytest.mark.parametrize("env_var", ["AUTH_MS_BASE_URL", "MS_HTTP_TIMEOUT"])
 def test_get_profile_raises_naming_a_missing_env_var(monkeypatch, profile_env, env_var):
     """Verify that get profile raises naming a missing env var."""
     monkeypatch.delenv(env_var, raising=False)

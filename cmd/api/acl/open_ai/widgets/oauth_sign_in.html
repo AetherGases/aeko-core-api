@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Entrar na Aeko</title>
+</head>
+
+<body
+  style="
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 10% 10%, rgba(213, 203, 255, 0.85), transparent 30%),
+      radial-gradient(circle at 90% 20%, rgba(205, 247, 234, 0.8), transparent 28%),
+      linear-gradient(180deg, #f7f5ff 0%, #f2faf8 45%, #f5f8fb 100%);
+    font-family: Inter, Arial, Helvetica, sans-serif;
+    color: #4e4d68;
+  "
+>
+  <main
+    style="
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 1180px;
+      min-height: 100vh;
+      margin: 0 auto;
+      padding:
+        clamp(24px, 5vw, 64px)
+        clamp(16px, 4vw, 32px);
+      display: flex;
+      align-items: center;
+    "
+  >
+    <section
+      style="
+        width: 100%;
+        display: grid;
+        grid-template-columns:
+          repeat(
+            auto-fit,
+            minmax(
+              min(100%, 360px),
+              1fr
+            )
+          );
+        gap: clamp(32px, 6vw, 72px);
+        align-items: center;
+      "
+    >
+      <div
+        style="
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+        "
+      >
+        <img
+          src="ic_aeko_mascot.png"
+          alt="Mascote Aeko"
+          style="
+            width: clamp(120px, 20vw, 180px);
+            max-width: 45%;
+            height: auto;
+            display: block;
+            margin-bottom: clamp(18px, 3vw, 26px);
+            filter: drop-shadow(0 18px 20px rgba(57, 167, 137, 0.12));
+          "
+        />
+
+        <span
+          style="
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 14px;
+            margin-bottom: 18px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.65);
+            border: 1px solid rgba(94, 91, 128, 0.08);
+            color: #6d6a8d;
+            font-size: clamp(11px, 1vw, 13px);
+            font-weight: 600;
+            box-shadow: 0 8px 24px rgba(80, 74, 116, 0.05);
+          "
+        >
+          Conexão ChatGPT
+        </span>
+
+        <h1
+          style="
+            margin: 0 0 14px;
+            max-width: 560px;
+            font-size: clamp(30px, 5vw, 56px);
+            line-height: 1.05;
+            letter-spacing: -0.035em;
+            font-weight: 700;
+            color: #46445f;
+          "
+        >
+          Entre na sua conta
+        </h1>
+
+        <p
+          style="
+            margin: 0;
+            max-width: 520px;
+            font-size: clamp(14px, 1.6vw, 17px);
+            line-height: 1.65;
+            color: #74728a;
+          "
+        >
+          Use o mesmo e-mail e senha da plataforma Aether para autorizar o assistente.
+        </p>
+      </div>
+
+      <form
+        method="post"
+        action="__FORM_ACTION__"
+        style="
+          box-sizing: border-box;
+          width: 100%;
+          min-width: 0;
+          max-width: 620px;
+          justify-self: center;
+          padding: clamp(20px, 4vw, 36px);
+          display: flex;
+          flex-direction: column;
+          gap: clamp(18px, 2.5vw, 24px);
+          border-radius: clamp(22px, 3vw, 30px);
+          background: rgba(255, 255, 255, 0.72);
+          border: 1px solid rgba(112, 106, 145, 0.08);
+          backdrop-filter: blur(18px);
+          box-shadow: 0 24px 70px rgba(81, 78, 112, 0.1);
+        "
+      >
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label
+            for="email"
+            style="font-size: 13px; font-weight: 700; color: #55536d;"
+          >
+            E-mail
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autocomplete="email"
+            placeholder="seu@email.com"
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              min-width: 0;
+              height: clamp(48px, 6vw, 52px);
+              padding: 0 16px;
+              border: 1px solid rgba(88, 84, 120, 0.1);
+              border-radius: 16px;
+              outline: none;
+              background: rgba(255, 255, 255, 0.9);
+              color: #4e4d68;
+              font-size: 14px;
+              font-family: inherit;
+              box-shadow: 0 7px 22px rgba(76, 72, 108, 0.04);
+            "
+          />
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label
+            for="password"
+            style="font-size: 13px; font-weight: 700; color: #55536d;"
+          >
+            Senha
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autocomplete="current-password"
+            placeholder="Sua senha"
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              min-width: 0;
+              height: clamp(48px, 6vw, 52px);
+              padding: 0 16px;
+              border: 1px solid rgba(88, 84, 120, 0.1);
+              border-radius: 16px;
+              outline: none;
+              background: rgba(255, 255, 255, 0.9);
+              color: #4e4d68;
+              font-size: 14px;
+              font-family: inherit;
+              box-shadow: 0 7px 22px rgba(76, 72, 108, 0.04);
+            "
+          />
+        </div>
+
+        <button
+          type="submit"
+          style="
+            box-sizing: border-box;
+            width: 100%;
+            min-height: clamp(48px, 6vw, 52px);
+            margin-top: 4px;
+            padding: 0 18px;
+            border: 0;
+            border-radius: 17px;
+            background: #2bcf99;
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 12px 28px rgba(43, 207, 153, 0.24);
+          "
+        >
+          Entrar
+        </button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

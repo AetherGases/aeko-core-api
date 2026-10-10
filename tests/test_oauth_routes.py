@@ -181,7 +181,7 @@ def test_get_authorize_returns_sign_in_html(oauth_env):
     assert "accessToken" not in html
     assert "refreshToken" not in html
     assert "cpf" not in html
-    assert "Aether" in html or "Sign in" in html
+    assert "Entre na sua conta" in html
     assert f'action="{ISSUER}{AUTHORIZE_PATH}"' in html
 
 

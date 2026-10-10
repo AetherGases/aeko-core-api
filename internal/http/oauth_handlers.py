@@ -1,9 +1,11 @@
 """Expose OAuth 2.1 discovery, ChatGPT Sign in, and token endpoints."""
 
+from functools import lru_cache
 from html import escape
+from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from oauth.discovery import (
     AUTHORIZE_PATH,
@@ -18,6 +20,19 @@ from oauth.oauth import IService
 from oauth.service import validate_authorize_parameters
 
 router = APIRouter()
+
+_WIDGETS_DIR = (
+    Path(__file__).resolve().parents[2] / "cmd" / "api" / "acl" / "open_ai" / "widgets"
+)
+_SIGN_IN_TEMPLATE_PATH = _WIDGETS_DIR / "oauth_sign_in.html"
+_MASCOT_PATH = _WIDGETS_DIR / "ic_aeko_mascot.png"
+MASCOT_PATH = "/aether-api/v1/oauth/ic_aeko_mascot.png"
+
+
+@lru_cache
+def _sign_in_template() -> str:
+    """Load the OAuth sign-in HTML template once."""
+    return _SIGN_IN_TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
 def get_oauth_service(request: Request) -> IService:
@@ -52,19 +67,34 @@ def render_sign_in(
     ]
     if resource:
         hidden.append(_hidden("resource", resource))
-    message = f"<p>{escape(error)}</p>" if error else ""
+    if error:
+        error_block = (
+            '<div style="'
+            "padding: 12px 14px;"
+            "border-radius: 14px;"
+            "background: rgba(255, 230, 230, 0.9);"
+            "border: 1px solid rgba(200, 80, 80, 0.25);"
+            "color: #8b3a3a;"
+            "font-size: 13px;"
+            "font-weight: 600;"
+            '">'
+            f"{escape(error)}"
+            "</div>"
+        )
+    else:
+        error_block = ""
     return (
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
-        "<title>Aether Sign in</title></head><body>"
-        "<h1>Aether Sign in</h1>"
-        f"{message}"
-        f"<form method=\"post\" action=\"{public_url(AUTHORIZE_PATH)}\">"
-        "<label>Email <input type=\"email\" name=\"email\" required></label>"
-        "<label>Password <input type=\"password\" name=\"password\" required></label>"
-        f"{''.join(hidden)}"
-        "<button type=\"submit\">Sign in</button>"
-        "</form></body></html>"
+        _sign_in_template()
+        .replace("__FORM_ACTION__", public_url(AUTHORIZE_PATH))
+        .replace("__HIDDEN_FIELDS__", "".join(hidden))
+        .replace("__ERROR_BLOCK__", error_block)
     )
+
+
+@router.get(MASCOT_PATH, include_in_schema=False)
+def oauth_sign_in_mascot():
+    """Serve the mascot image used by the OAuth sign-in page."""
+    return FileResponse(_MASCOT_PATH, media_type="image/png")
 
 
 @router.get("/.well-known/oauth-authorization-server", include_in_schema=False)

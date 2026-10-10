@@ -1,4 +1,4 @@
-"""Orchestrate ChatGPT Sign in against ms-auth and ms-profile, then issue this API's tokens."""
+"""Orchestrate ChatGPT Sign in against ms-auth (login + profile), then issue this API's tokens."""
 
 import hmac
 import re

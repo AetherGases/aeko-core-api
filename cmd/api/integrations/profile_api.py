@@ -1,4 +1,4 @@
-"""Frozen HTTP client for the profile microservice profile endpoint."""
+"""Frozen HTTP client for the ms-auth profile endpoint (GET /api/profile)."""
 
 import os
 from typing import Any
@@ -9,17 +9,17 @@ PROFILE_MS_PATH = "/api/profile"
 
 
 class ProfileError(RuntimeError):
-    """Raised when a call to the profile microservice cannot be completed."""
+    """Raised when a call to the auth microservice profile route cannot be completed."""
 
 
 def _base_url() -> str:
-    """Resolve the profile microservice base URL from the environment."""
+    """Resolve the auth microservice base URL from the environment."""
 
-    base_url = os.environ.get("PROFILE_MS_BASE_URL", "")
+    base_url = os.environ.get("AUTH_MS_BASE_URL", "")
 
     if base_url == "":
         raise RuntimeError(
-            "PROFILE_MS_BASE_URL is not set. Please set it in the environment."
+            "AUTH_MS_BASE_URL is not set. Please set it in the environment."
         )
 
     return base_url
@@ -77,9 +77,9 @@ def _positive_int(value: Any, field_name: str) -> int:
 
 
 def _request(method: str, url: str, access_token: str, **kwargs: Any) -> Any:
-    """Send a profile microservice HTTP request and translate transport and status errors."""
+    """Send an ms-auth profile HTTP request and translate transport and status errors."""
 
-    headers = {"Authentication": f"Bearer {access_token}"}
+    headers = {"Authorization": f"Bearer {access_token}"}
 
     try:
         response = requests.request(
@@ -87,12 +87,12 @@ def _request(method: str, url: str, access_token: str, **kwargs: Any) -> Any:
         )
     except requests.RequestException as exc:
         raise ProfileError(
-            f"Could not reach the profile microservice at {url}: {exc}"
+            f"Could not reach the auth microservice at {url}: {exc}"
         ) from exc
 
     if response.status_code >= 400:
         raise ProfileError(
-            f"The profile microservice answered {response.status_code} for {url}: "
+            f"The auth microservice answered {response.status_code} for {url}: "
             f"{_error_detail(response)}"
         )
 
@@ -100,13 +100,13 @@ def _request(method: str, url: str, access_token: str, **kwargs: Any) -> Any:
         return response.json()
     except ValueError as exc:
         raise ProfileError(
-            f"The profile microservice answered {response.status_code} for {url} with "
+            f"The auth microservice answered {response.status_code} for {url} with "
             f"something that is not JSON: {response.text.strip()!r}"
         ) from exc
 
 
 def get_profile(access_token: str) -> dict:
-    """Fetch the authenticated user's profile and return the microservice payload as-is."""
+    """Fetch the logged-in user's profile from ms-auth and return the payload as-is."""
 
     url = f"{_base_url()}{PROFILE_MS_PATH}"
     return _request("GET", url, access_token)

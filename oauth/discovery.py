@@ -1,12 +1,12 @@
 """OAuth discovery URLs and metadata documents."""
 
-from oauth.constants import OAUTH_AUDIENCE, OAUTH_ISSUER
-
-AUTHORIZE_PATH = "/aether-api/v1/oauth/authorize"
-TOKEN_PATH = "/aether-api/v1/oauth/token"
-PROTECTED_RESOURCE_WELL_KNOWN_PATH = "/.well-known/oauth-protected-resource"
-MCP_PROTECTED_RESOURCE_WELL_KNOWN_PATH = (
-    "/aether-api/v1/mcp/.well-known/oauth-protected-resource"
+from oauth.constants import (
+    AUTHORIZE_PATH,
+    MCP_PROTECTED_RESOURCE_WELL_KNOWN_PATH,
+    OAUTH_AUDIENCE,
+    OAUTH_ISSUER,
+    PROTECTED_RESOURCE_WELL_KNOWN_PATH,
+    TOKEN_PATH,
 )
 
 

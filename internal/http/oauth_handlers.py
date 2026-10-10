@@ -1,17 +1,13 @@
 """Expose OAuth 2.1 discovery, ChatGPT Sign in, and token endpoints."""
 
-from functools import lru_cache
 from html import escape
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
+from oauth.constants import AUTHORIZE_PATH, MCP_PROTECTED_RESOURCE_WELL_KNOWN_PATH, PROTECTED_RESOURCE_WELL_KNOWN_PATH, TOKEN_PATH
 from oauth.discovery import (
-    AUTHORIZE_PATH,
-    MCP_PROTECTED_RESOURCE_WELL_KNOWN_PATH,
-    PROTECTED_RESOURCE_WELL_KNOWN_PATH,
-    TOKEN_PATH,
     authorization_server_metadata_document,
     protected_resource_metadata_document,
     public_url,
@@ -29,9 +25,8 @@ _MASCOT_PATH = _WIDGETS_DIR / "ic_aeko_mascot.png"
 MASCOT_PATH = "/aether-api/v1/oauth/ic_aeko_mascot.png"
 
 
-@lru_cache
 def _sign_in_template() -> str:
-    """Load the OAuth sign-in HTML template once."""
+    """Load the OAuth sign-in HTML template."""
     return _SIGN_IN_TEMPLATE_PATH.read_text(encoding="utf-8")
 
 

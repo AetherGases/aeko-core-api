@@ -75,6 +75,17 @@ class InMemoryUserRepository:
             raise ValueError(f"User with id_external_user {id_external_user} not found.")
         return user
 
+    def create_user(self, id_external_user, role, usecase):
+        """Persist a new user with the supplied profile fields."""
+        user = User(
+            id=f"u-{id_external_user}",
+            id_external_user=id_external_user,
+            role=role,
+            usecase=usecase,
+        )
+        self.users[id_external_user] = user
+        return user
+
     def get_user_by_id(self, id_user):
         """Retrieve a user by internal identifier, returning None when absent."""
         return next((user for user in self.users.values() if user.id == id_user), None)

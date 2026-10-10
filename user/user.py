@@ -10,6 +10,16 @@ class IRepository(ABC):
         pass
 
     @abstractmethod
+    def create_user(self, id_external_user: int, role: str, usecase: str) -> User:
+        """Persist a new user with the supplied profile fields."""
+        pass
+
+    @abstractmethod
+    def update_role_and_usecase(self, id_external_user: int, role: str, usecase: str) -> None:
+        """Persist the role and usecase on the user matching an external identifier."""
+        pass
+
+    @abstractmethod
     def get_user_by_id(self, id_user: str) -> User:
         """Retrieve a user by internal identifier, returning None when absent."""
         pass
@@ -33,6 +43,16 @@ class IService(ABC):
     @abstractmethod
     def get_mongo_user(self, id_external_user) -> User:
         """Retrieve the stored user matching an external identifier."""
+        pass
+
+    @abstractmethod
+    def get_mongo_user_or_create(self, id_external_user: int, role: str, usecase: str) -> User:
+        """Return the stored user or create one with the supplied profile fields."""
+        pass
+
+    @abstractmethod
+    def apply_sign_in_profile(self, id_external_user: int, role: str, usecase: str) -> User:
+        """Create the user or refresh role and usecase after each OAuth Sign in."""
         pass
 
     @abstractmethod

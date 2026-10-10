@@ -11,8 +11,8 @@ from session.cache.repository import Repository as CacheRepository
 from session.service import Service
 from session.session import GuardrailRejectedError, IService
 
-from user.database.repository import Repository as UserRepository
 from cmd.memory_generator_worker.constants import REDIS_SCAN_COUNT, SESSION_INACTIVITY_MINUTES
+from user.database.repository import Repository as UserRepository
 
 router = APIRouter(tags=["Sessions"])
 
@@ -193,7 +193,6 @@ async def send_message(
     id_session = body.get("id_session")
     input = body.get("input", "")
     id_user = body.get("id_user", "")
-
     aeko_messenger_factory = request.app.state._state.get("aeko_messenger_factory")
     aeko_session_factory = request.app.state._state.get("aeko_session_factory")
 

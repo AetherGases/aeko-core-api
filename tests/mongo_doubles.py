@@ -2,12 +2,21 @@
 
 
 class StubCollection:
-    def __init__(self, find_one_result=None, find_one_results=None, find_result=None, error=None, inserted_id="inserted-id"):
+    def __init__(
+        self,
+        find_one_result=None,
+        find_one_results=None,
+        find_result=None,
+        error=None,
+        inserted_id="inserted-id",
+        update_matched_count=1,
+    ):
         self.find_one_result = find_one_result
         self.find_one_results = list(find_one_results) if find_one_results is not None else None
         self.find_result = list(find_result or [])
         self.error = error
         self.inserted_id = inserted_id
+        self.update_matched_count = update_matched_count
         self.calls = []
         self.find_options = []
 
@@ -37,7 +46,9 @@ class StubCollection:
     def update_one(self, query, update):
         """Record a document update and return a simulated update result."""
         self._record("update_one", query, update)
-        return type("UpdateResult", (), {"modified_count": 1})()
+        matched = self.update_matched_count
+        modified = 1 if matched else 0
+        return type("UpdateResult", (), {"matched_count": matched, "modified_count": modified})()
 
     def replace_one(self, query, replacement, upsert=False):
         """Record a document replacement and return a simulated replace result."""

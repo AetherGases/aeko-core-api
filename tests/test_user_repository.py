@@ -96,6 +96,55 @@ def test_set_id_external_company_updates_the_user_document():
     assert update == {"$set": {"id_external_company": 90}}
 
 
+def test_create_user_inserts_the_document_and_returns_the_entity():
+    """Verify that create user inserts the document and returns the user entity."""
+    collection = StubCollection(inserted_id=ObjectId())
+    repository, _ = build_repository(user=collection)
+
+    user = repository.create_user(99, "analyst", "report_generation")
+
+    document = collection.call_args("insert_one")[0][0]
+    assert document["id_external_user"] == 99
+    assert document["role"] == "analyst"
+    assert document["usecase"] == "report_generation"
+    assert user.id_external_user == 99
+    assert user.role == "analyst"
+    assert user.usecase == "report_generation"
+    assert user.id == str(collection.inserted_id)
+
+
+def test_update_role_and_usecase_updates_the_user_document():
+    """Verify that update role and usecase updates the user document."""
+    collection = StubCollection(find_one_result=USER_DOCUMENT)
+    repository, _ = build_repository(user=collection)
+
+    repository.update_role_and_usecase(12345, "gestor", "auditoria")
+
+    query, update = collection.call_args("update_one")[0]
+    assert query == q.get_user_query_filter(12345)
+    assert update == {"$set": {"role": "gestor", "usecase": "auditoria"}}
+
+
+def test_update_role_and_usecase_raises_when_the_user_is_missing():
+    """Verify that update role and usecase raises when the user is missing."""
+    repository, _ = build_repository(
+        user=StubCollection(find_one_result=None, update_matched_count=0)
+    )
+
+    with pytest.raises(ValueError, match="not found"):
+        repository.update_role_and_usecase(12345, "gestor", "auditoria")
+
+
+def test_create_user_query_builds_the_expected_document():
+    """Verify that create user query builds the expected document."""
+    document = q.create_user_query(99, "analyst", "report_generation")
+    assert document == {
+        "id_external_user": 99,
+        "role": "analyst",
+        "usecase": "report_generation",
+    }
+
+
 def test_get_user_queries_by_the_external_identifier():
     """Verify that get user queries by the external identifier."""
     collection = StubCollection(find_one_result=USER_DOCUMENT)

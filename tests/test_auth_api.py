@@ -55,10 +55,10 @@ def auth_env(monkeypatch):
 @pytest.fixture
 def recorded_request(monkeypatch, auth_env):
     """Replace auth HTTP requests with a call recorder."""
-    from cmd.api.integrations import auth_api
+    from cmd.api.integrations import auth_api, ms_auth_http
 
     request = RecordingRequest(FakeResponse(payload=LOGIN_PAYLOAD))
-    monkeypatch.setattr(auth_api.requests, "request", request)
+    monkeypatch.setattr(ms_auth_http.requests, "request", request)
     return request
 
 
@@ -96,10 +96,10 @@ def test_login_raises_naming_a_missing_env_var(monkeypatch, auth_env, env_var):
 
 def test_login_raises_on_http_error(monkeypatch, auth_env):
     """Verify that login raises on http error."""
-    from cmd.api.integrations import auth_api
+    from cmd.api.integrations import auth_api, ms_auth_http
 
     monkeypatch.setattr(
-        auth_api.requests,
+        ms_auth_http.requests,
         "request",
         RecordingRequest(FakeResponse(status_code=401, payload={"message": "denied"})),
     )
@@ -109,10 +109,10 @@ def test_login_raises_on_http_error(monkeypatch, auth_env):
 
 def test_login_raises_on_transport_error(monkeypatch, auth_env):
     """Verify that login raises on transport error."""
-    from cmd.api.integrations import auth_api
+    from cmd.api.integrations import auth_api, ms_auth_http
 
     monkeypatch.setattr(
-        auth_api.requests,
+        ms_auth_http.requests,
         "request",
         RecordingRequest(error=requests.ConnectionError("down")),
     )

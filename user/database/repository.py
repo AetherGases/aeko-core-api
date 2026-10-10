@@ -9,6 +9,29 @@ class Repository(IRepository):
     def __init__(self, db):
         self.db = db
 
+    @logged(Module.DATABASE, "user.create_user")
+    def create_user(self, id_external_user: int, role: str, usecase: str) -> User:
+        """Persist a new user and return the stored entity."""
+        try:
+            document = q.create_user_query(id_external_user, role, usecase)
+            result = self.db.user.insert_one(document)
+            return user_from_data({**document, "_id": result.inserted_id})
+        except Exception as e:
+            raise RuntimeError(f"Error creating user in database: {e}")
+
+    @logged(Module.DATABASE, "user.update_role_and_usecase")
+    def update_role_and_usecase(self, id_external_user: int, role: str, usecase: str) -> None:
+        """Persist the role and usecase on the user matching an external identifier."""
+        try:
+            query, update = q.update_role_and_usecase_query(id_external_user, role, usecase)
+            result = self.db.user.update_one(query, update)
+            if result.matched_count == 0:
+                raise ValueError(f"User with id_external_user {id_external_user} not found.")
+        except ValueError as e:
+            raise e
+        except Exception as e:
+            raise RuntimeError(f"Error updating user role and usecase in database: {e}")
+
     @logged(Module.DATABASE, "user.get_user")
     def get_user(self, id_external_user) -> User:
         """Retrieve a user by external identifier."""

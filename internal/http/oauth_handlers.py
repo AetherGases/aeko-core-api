@@ -51,6 +51,9 @@ def render_sign_in(
     code_challenge_method: str,
     resource: str | None = None,
     error: str | None = None,
+    email: str = "",
+    role: str = "",
+    usecase: str = "",
 ) -> str:
     """Return the ChatGPT Sign in webview HTML for the supplied OAuth parameters."""
     hidden = [
@@ -83,6 +86,9 @@ def render_sign_in(
         .replace("__FORM_ACTION__", public_url(AUTHORIZE_PATH))
         .replace("__HIDDEN_FIELDS__", "".join(hidden))
         .replace("__ERROR_BLOCK__", error_block)
+        .replace("__EMAIL_VALUE__", escape(email))
+        .replace("__ROLE_VALUE__", escape(role))
+        .replace("__USECASE_VALUE__", escape(usecase))
     )
 
 
@@ -149,6 +155,8 @@ def authorize_post(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    role: str = Form(...),
+    usecase: str = Form(...),
     client_id: str = Form(...),
     redirect_uri: str = Form(...),
     state: str = Form(...),
@@ -157,6 +165,17 @@ def authorize_post(
     resource: str | None = Form(None),
 ):
     """Authenticate through the OAuth service and redirect to the client, or stay on Sign in."""
+    sign_in_kwargs = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "state": state,
+        "code_challenge": code_challenge,
+        "code_challenge_method": code_challenge_method,
+        "resource": resource,
+        "email": email,
+        "role": role,
+        "usecase": usecase,
+    }
     try:
         location = get_oauth_service(request).authorize(
             email,
@@ -167,16 +186,13 @@ def authorize_post(
             code_challenge=code_challenge,
             code_challenge_method=code_challenge_method,
             resource=resource,
+            usecase=usecase,
+            role_from_form=role,
         )
     except ValueError:
         return HTMLResponse(
             render_sign_in(
-                client_id=client_id,
-                redirect_uri=redirect_uri,
-                state=state,
-                code_challenge=code_challenge,
-                code_challenge_method=code_challenge_method,
-                resource=resource,
+                **sign_in_kwargs,
                 error="Sign in failed.",
             ),
             status_code=401,

@@ -14,6 +14,14 @@ def get_user_query_filter(id_external_user: int) -> dict:
         "id_external_user": id_external_user
     }
 
+def create_user_query(id_external_user: int, role: str, usecase: str) -> dict:
+    """Build a new user document for MongoDB insertion."""
+    return {
+        "id_external_user": id_external_user,
+        "role": role,
+        "usecase": usecase,
+    }
+
 def get_user_query(id_user: str) -> tuple[dict, dict]:
     """Build the filter and projection for an internal user identifier."""
     return id_filter("_id", id_user), {}
@@ -21,6 +29,10 @@ def get_user_query(id_user: str) -> tuple[dict, dict]:
 def set_id_external_company_query(id_user: str, id_external_company: int) -> tuple[dict, dict]:
     """Build the filter and $set document for a user's company identifier."""
     return id_filter("_id", id_user), {"$set": {"id_external_company": id_external_company}}
+
+def update_role_and_usecase_query(id_external_user: int, role: str, usecase: str) -> tuple[dict, dict]:
+    """Build the filter and $set document for a user's role and usecase."""
+    return get_user_query_filter(id_external_user), {"$set": {"role": role, "usecase": usecase}}
 
 def get_user_memories_query(id_user: str) -> dict:
     """Build the filter for memories belonging to a user."""

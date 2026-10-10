@@ -52,6 +52,8 @@ class StubOAuthService:
         code_challenge,
         code_challenge_method,
         resource=None,
+        usecase="",
+        role_from_form=None,
     ):
         """Record authorize arguments and return a redirect or raise the scripted error."""
         self.authorize_calls.append(
@@ -64,6 +66,8 @@ class StubOAuthService:
                 "code_challenge": code_challenge,
                 "code_challenge_method": code_challenge_method,
                 "resource": resource,
+                "usecase": usecase,
+                "role_from_form": role_from_form,
             }
         )
         if self.authorize_error is not None:
@@ -116,6 +120,8 @@ def authorize_form(**overrides):
         "code_challenge": s256(VERIFIER),
         "code_challenge_method": "S256",
         "resource": AUDIENCE,
+        "usecase": "Inventário de emissões",
+        "role": "Analista ESG",
     }
     body.update(overrides)
     return body
@@ -167,6 +173,9 @@ def test_get_authorize_returns_sign_in_html(oauth_env):
     html = response.text
     assert 'name="email"' in html
     assert 'name="password"' in html
+    assert 'name="role"' in html
+    assert 'name="usecase"' in html
+    assert html.index('name="password"') < html.index('name="role"') < html.index('name="usecase"')
     assert 'type="password"' in html
     assert 'name="client_id"' in html
     assert 'name="redirect_uri"' in html

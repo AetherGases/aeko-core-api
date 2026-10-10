@@ -62,8 +62,9 @@ def validate_authorize_parameters(
 
 
 class Service(IService):
-    def __init__(self, repository):
+    def __init__(self, repository, users=None):
         self.repository = repository
+        self.users = users
 
     def authorize(
         self,
@@ -76,6 +77,8 @@ class Service(IService):
         code_challenge: str,
         code_challenge_method: str,
         resource=None,
+        usecase: str = "",
+        role_from_form: str | None = None,
     ) -> str:
         """Authenticate the user and return the client redirect URL with code, state, and iss."""
         validate_authorize_parameters(
@@ -98,6 +101,15 @@ class Service(IService):
             id_external_user = profile_id(profile)
         except Exception as exc:
             raise ValueError("Sign in failed.") from exc
+        if self.users is not None:
+            try:
+                self.users.apply_sign_in_profile(
+                    id_external_user,
+                    role_from_form or "",
+                    usecase,
+                )
+            except Exception as exc:
+                raise ValueError("Sign in failed.") from exc
         code = secrets.token_urlsafe(32)
         self.repository.save(
             code,

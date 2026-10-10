@@ -202,6 +202,19 @@ class StubUserService:
             raise ValueError(f"User with id_external_user {id_external_user} not found.")
         return self.user
 
+    def get_mongo_user_or_create(self, id_external_user, role, usecase):
+        """Return the stored user or create one with the supplied profile fields."""
+        try:
+            return self.get_mongo_user(id_external_user)
+        except ValueError:
+            self.user = User(
+                id=ID_USER,
+                id_external_user=id_external_user,
+                role=role,
+                usecase=usecase,
+            )
+            return self.user
+
     def get_user_memories(self, id_user):
         """Retrieve the memories stored for a user."""
         return self.memories

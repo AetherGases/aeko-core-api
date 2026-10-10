@@ -57,10 +57,10 @@ def profile_env(monkeypatch):
 @pytest.fixture
 def recorded_request(monkeypatch, profile_env):
     """Replace profile HTTP requests with a call recorder."""
-    from cmd.api.integrations import profile_api
+    from cmd.api.integrations import ms_auth_http, profile_api
 
     request = RecordingRequest(FakeResponse(payload=PROFILE_PAYLOAD))
-    monkeypatch.setattr(profile_api.requests, "request", request)
+    monkeypatch.setattr(ms_auth_http.requests, "request", request)
     return request
 
 
@@ -117,10 +117,10 @@ def test_get_profile_raises_naming_a_missing_env_var(monkeypatch, profile_env, e
 @pytest.mark.parametrize("status_code", [401, 500])
 def test_get_profile_raises_on_http_error(monkeypatch, profile_env, status_code):
     """Verify that get profile raises on http error."""
-    from cmd.api.integrations import profile_api
+    from cmd.api.integrations import ms_auth_http, profile_api
 
     monkeypatch.setattr(
-        profile_api.requests,
+        ms_auth_http.requests,
         "request",
         RecordingRequest(FakeResponse(status_code=status_code, payload={"message": "denied"})),
     )
@@ -130,10 +130,10 @@ def test_get_profile_raises_on_http_error(monkeypatch, profile_env, status_code)
 
 def test_get_profile_raises_on_transport_error(monkeypatch, profile_env):
     """Verify that get profile raises on transport error."""
-    from cmd.api.integrations import profile_api
+    from cmd.api.integrations import ms_auth_http, profile_api
 
     monkeypatch.setattr(
-        profile_api.requests,
+        ms_auth_http.requests,
         "request",
         RecordingRequest(error=requests.ConnectionError("down")),
     )

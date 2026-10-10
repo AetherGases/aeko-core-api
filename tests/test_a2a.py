@@ -34,6 +34,20 @@ class StubUserService:
             usecase="report_generation",
         )
 
+    def get_mongo_user_or_create(self, id_external_user, role, usecase):
+        """Return the stored user or create one with the supplied profile fields."""
+        try:
+            return self.get_mongo_user(id_external_user)
+        except ValueError:
+            self.calls.append(("create_user", id_external_user, role, usecase))
+            self.raise_missing = False
+            return User(
+                id=self.user_id,
+                id_external_user=id_external_user,
+                role=role,
+                usecase=usecase,
+            )
+
 
 class StubSessionService:
     def __init__(self):

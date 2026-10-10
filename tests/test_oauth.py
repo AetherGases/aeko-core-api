@@ -60,7 +60,7 @@ def stub_sign_in(monkeypatch, profile=None, profile_error=None):
         """Return or raise the scripted profile payload."""
         if profile_error is not None:
             raise profile_error
-        return profile if profile is not None else {"id": 1}
+        return profile if profile is not None else {"id": 1, "cargo": "analyst"}
 
     monkeypatch.setattr("oauth.service.get_profile", get_profile)
 
@@ -74,6 +74,8 @@ def authorize(
     code_challenge=None,
     code_challenge_method="S256",
     resource=None,
+    usecase="Inventário de emissões",
+    role_from_form="Analista ESG",
 ):
     """Run authorize with ChatGPT PKCE defaults for the test."""
     return service.authorize(
@@ -85,6 +87,8 @@ def authorize(
         code_challenge=s256(VERIFIER) if code_challenge is None else code_challenge,
         code_challenge_method=code_challenge_method,
         resource=resource,
+        usecase=usecase,
+        role_from_form=role_from_form,
     )
 
 
@@ -142,12 +146,43 @@ def test_authorize_calls_auth_then_profile_and_does_not_return_ms_tokens(
         state="xyz",
         code_challenge=s256("verifier-12345678901234567890123456789012"),
         code_challenge_method="S256",
+        usecase="Inventário de emissões",
     )
     assert order == [("login", "caio@example.com", "secret"), ("profile", "ms-access")]
     assert "ms-access" not in redirect
     assert "ms-refresh" not in redirect
     assert "cpf" not in redirect
     assert "code=" in redirect and "state=xyz" in redirect
+
+
+def test_authorize_applies_sign_in_profile_after_authentication(monkeypatch, oauth_env):
+    """Verify that authorize refreshes role and usecase on every Sign in."""
+    from oauth.service import Service
+
+    calls = []
+
+    class Users:
+        def apply_sign_in_profile(self, id_external_user, role, usecase):
+            """Record the Sign in profile sync."""
+            calls.append(("apply_sign_in_profile", id_external_user, role, usecase))
+
+    stub_sign_in(monkeypatch, profile={"id": 42})
+    authorize(
+        Service(InMemoryCodes(), Users()),
+        usecase="Plano de melhorias",
+        role_from_form="Especialista",
+    )
+
+    assert calls == [("apply_sign_in_profile", 42, "Especialista", "Plano de melhorias")]
+
+
+def test_authorize_skips_provisioning_when_users_service_is_not_configured(monkeypatch, oauth_env):
+    """Verify that authorize still works when no Mongo users service is wired."""
+    from oauth.service import Service
+
+    stub_sign_in(monkeypatch, profile={"id": 7})
+    redirect = authorize(Service(InMemoryCodes()))
+    assert "code=" in redirect
 
 
 @pytest.mark.parametrize(

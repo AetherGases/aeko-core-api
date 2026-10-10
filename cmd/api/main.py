@@ -412,7 +412,8 @@ async def lifespan(app: FastAPI):
         improvement_plans=ImprovementPlanService(ImprovementPlanRepository(db)),
     )
 
-    app.state.oauth = OAuthService(OAuthCodeRepository(redis_client))
+    user_service = UserService(UserRepository(db))
+    app.state.oauth = OAuthService(OAuthCodeRepository(redis_client), user_service)
 
     ticket_service = UploadTicketService(UploadTicketRepository(redis_client))
     configure_inventory_tools(

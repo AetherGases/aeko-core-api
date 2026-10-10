@@ -12,7 +12,7 @@ MCP_HEADERS = {
     "Content-Type": "application/json",
 }
 RESOURCE_METADATA = (
-    "https://aeko.example.com/.well-known/oauth-protected-resource"
+    "https://aeko.example.com/aether-api/v1/mcp/.well-known/oauth-protected-resource"
 )
 AUTHENTICATED_CALLS = (
     ("ask_aeko", {"input": "hi"}),

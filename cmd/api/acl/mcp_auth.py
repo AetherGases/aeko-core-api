@@ -8,7 +8,7 @@ from cmd.api.acl.open_ai.identity import (
     bind_id_external_user,
     reset_id_external_user,
 )
-from oauth.constants import OAUTH_ISSUER
+from oauth.discovery import mcp_protected_resource_metadata_url
 from oauth.token import decode_access_token
 
 ERROR_DESCRIPTION = "You need to login to continue"
@@ -17,7 +17,7 @@ ERROR_DESCRIPTION = "You need to login to continue"
 def www_authenticate_value() -> str:
     """Return the WWW-Authenticate challenge ChatGPT uses to open Sign in."""
     return (
-        f'Bearer resource_metadata="{OAUTH_ISSUER}/.well-known/oauth-protected-resource", '
+        f'Bearer resource_metadata="{mcp_protected_resource_metadata_url()}", '
         f'scope="mcp", error="insufficient_scope", '
         f'error_description="{ERROR_DESCRIPTION}"'
     )

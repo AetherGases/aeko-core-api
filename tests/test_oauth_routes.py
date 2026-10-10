@@ -182,6 +182,18 @@ def test_get_authorize_returns_sign_in_html(oauth_env):
     assert "refreshToken" not in html
     assert "cpf" not in html
     assert "Aether" in html or "Sign in" in html
+    assert f'action="{ISSUER}{AUTHORIZE_PATH}"' in html
+
+
+def test_protected_resource_metadata_at_mcp_path(oauth_env):
+    """Verify that protected-resource metadata is also served on the MCP resource path."""
+    response = build_client(StubOAuthService()).get(
+        "/aether-api/v1/mcp/.well-known/oauth-protected-resource"
+    )
+    body = response.json()
+    assert response.status_code == 200
+    assert body["resource"] == AUDIENCE
+    assert body["authorization_servers"] == [ISSUER]
 
 
 def test_post_authorize_redirects_with_code_state_and_iss(oauth_env):

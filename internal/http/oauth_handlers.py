@@ -5,14 +5,19 @@ from html import escape
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from oauth.constants import OAUTH_AUDIENCE, OAUTH_ISSUER
+from oauth.discovery import (
+    AUTHORIZE_PATH,
+    MCP_PROTECTED_RESOURCE_WELL_KNOWN_PATH,
+    PROTECTED_RESOURCE_WELL_KNOWN_PATH,
+    TOKEN_PATH,
+    authorization_server_metadata_document,
+    protected_resource_metadata_document,
+    public_url,
+)
 from oauth.oauth import IService
 from oauth.service import validate_authorize_parameters
 
 router = APIRouter()
-
-AUTHORIZE_PATH = "/aether-api/v1/oauth/authorize"
-TOKEN_PATH = "/aether-api/v1/oauth/token"
 
 
 def get_oauth_service(request: Request) -> IService:
@@ -53,7 +58,7 @@ def render_sign_in(
         "<title>Aether Sign in</title></head><body>"
         "<h1>Aether Sign in</h1>"
         f"{message}"
-        f"<form method=\"post\" action=\"{AUTHORIZE_PATH}\">"
+        f"<form method=\"post\" action=\"{public_url(AUTHORIZE_PATH)}\">"
         "<label>Email <input type=\"email\" name=\"email\" required></label>"
         "<label>Password <input type=\"password\" name=\"password\" required></label>"
         f"{''.join(hidden)}"
@@ -65,28 +70,19 @@ def render_sign_in(
 @router.get("/.well-known/oauth-authorization-server", include_in_schema=False)
 def authorization_server_metadata():
     """Return OAuth 2.1 authorization-server metadata for ChatGPT discovery."""
-    return {
-        "issuer": OAUTH_ISSUER,
-        "authorization_endpoint": f"{OAUTH_ISSUER}{AUTHORIZE_PATH}",
-        "token_endpoint": f"{OAUTH_ISSUER}{TOKEN_PATH}",
-        "code_challenge_methods_supported": ["S256"],
-        "response_types_supported": ["code"],
-        "grant_types_supported": ["authorization_code"],
-        "token_endpoint_auth_methods_supported": ["none"],
-        "client_id_metadata_document_supported": True,
-        "authorization_response_iss_parameter_supported": True,
-    }
+    return authorization_server_metadata_document()
 
 
-@router.get("/.well-known/oauth-protected-resource", include_in_schema=False)
+@router.get(PROTECTED_RESOURCE_WELL_KNOWN_PATH, include_in_schema=False)
 def protected_resource_metadata():
     """Return OAuth protected-resource metadata for the MCP resource."""
-    return {
-        "resource": OAUTH_AUDIENCE,
-        "authorization_servers": [OAUTH_ISSUER],
-        "bearer_methods_supported": ["header"],
-        "scopes_supported": ["mcp"],
-    }
+    return protected_resource_metadata_document()
+
+
+@router.get(MCP_PROTECTED_RESOURCE_WELL_KNOWN_PATH, include_in_schema=False)
+def mcp_protected_resource_metadata():
+    """Return protected-resource metadata at the MCP resource path (RFC 9728)."""
+    return protected_resource_metadata_document()
 
 
 @router.get(AUTHORIZE_PATH, tags=["OAuth"])

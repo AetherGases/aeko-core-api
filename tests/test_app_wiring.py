@@ -103,6 +103,7 @@ def test_oauth_well_known_routes_are_registered(api_main):
 
     assert "/.well-known/oauth-authorization-server" in paths
     assert "/.well-known/oauth-protected-resource" in paths
+    assert "/aether-api/v1/mcp/.well-known/oauth-protected-resource" in paths
 
 
 def test_chatgpt_mcp_app_is_mounted_at_the_documented_prefix(api_main):

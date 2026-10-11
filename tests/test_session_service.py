@@ -18,7 +18,13 @@ SUBMITTED_AT = datetime(2026, 7, 26, 14, 30, 0)
 
 REVIEW_FAILURE = "no answer approved by the output guardrail or the response checker"
 
-USER = User(id=ID_USER, id_external_user=12345, role="analyst", usecase="report_generation")
+USER = User(
+    id=ID_USER,
+    id_external_user=12345,
+    role="analyst",
+    usecase="report_generation",
+    id_external_company=90,
+)
 
 
 class StubTurn:
@@ -688,6 +694,30 @@ def test_an_answered_turn_records_what_the_run_cost(recorded_metrics):
 
     assert [metrics.id_request for metrics in recorded_metrics] == ["65a8b3d6c0f8e1d7f4b2c0aa"]
     assert recorded_metrics[0].error_description is None
+
+
+def test_an_answered_turn_records_the_user_company():
+    """Verify that an answered turn records the user company."""
+    from internal.shared.event_tracking import (
+        current_metric_id_external_company,
+        current_metric_id_external_user,
+    )
+
+    seen = []
+
+    def sink(metrics):
+        """Capture the owner bound while the sink runs."""
+        seen.append(
+            (current_metric_id_external_user(), current_metric_id_external_company())
+        )
+
+    set_aeko_metrics_sink(sink)
+    try:
+        send(build_service()[0])
+    finally:
+        set_aeko_metrics_sink(None)
+
+    assert seen == [(12345, 90)]
 
 
 def test_a_turn_no_reviewer_approved_is_recorded_as_the_failure_it_was(recorded_metrics):

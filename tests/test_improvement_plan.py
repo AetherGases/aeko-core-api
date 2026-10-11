@@ -840,6 +840,30 @@ def test_an_analysis_records_what_it_cost(recorded_metrics):
     assert recorded_metrics[0].flow == "analytical"
 
 
+def test_an_analysis_records_the_user_company():
+    """Verify that an analysis records the user company."""
+    from internal.shared.event_tracking import (
+        current_metric_id_external_company,
+        current_metric_id_external_user,
+    )
+
+    seen = []
+
+    def sink(metrics):
+        """Capture the owner bound while the sink runs."""
+        seen.append(
+            (current_metric_id_external_user(), current_metric_id_external_company())
+        )
+
+    set_aeko_metrics_sink(sink)
+    try:
+        run()
+    finally:
+        set_aeko_metrics_sink(None)
+
+    assert seen == [(12345, 90)]
+
+
 def test_an_analysis_that_raised_records_the_tracking_it_carried_out(recorded_metrics):
     """Verify that an analysis that raised records the tracking it carried out."""
     error = RuntimeError("coordinator never produced the plan")

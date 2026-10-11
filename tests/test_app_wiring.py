@@ -58,6 +58,7 @@ def test_report_route_is_registered_on_the_application(api_main):
     "path",
     [
         "/aether-api/v1/ai/user/{id_external_user}",
+        "/aether-api/v1/ai/sessions/cost",
         "/aether-api/v1/ai/sessions/user/{id_user}",
         "/aether-api/v1/ai/session/{id_session}/messages",
         SEND_MESSAGE_ROUTE,

@@ -1,5 +1,7 @@
 """Define the domain entities for SDK run metrics."""
 
+from datetime import datetime
+
 class AgentMetric:
     """What one agent *invocation* of a run consumed."""
 
@@ -28,11 +30,16 @@ class Metric:
     flow: str
     cost_usd: float
     used_agents: list[AgentMetric]
+    id_external_user: int | None
+    id_external_company: int | None
+    created_at: datetime | None
 
     def __init__(self, id_request: str, latency: int, flow: str,
                  used_agents: list[AgentMetric] | None = None,
                  error_description: str | None = None, id: str | None = None,
-                 cost_usd: float = 0.0):
+                 cost_usd: float = 0.0, id_external_user: int | None = None,
+                 id_external_company: int | None = None,
+                 created_at: datetime | None = None):
         self.id = id
         self.id_request = id_request
         self.latency = latency
@@ -40,3 +47,30 @@ class Metric:
         self.flow = flow
         self.cost_usd = cost_usd
         self.used_agents = list(used_agents or [])
+        self.id_external_user = id_external_user
+        self.id_external_company = id_external_company
+        self.created_at = created_at
+
+
+class UserCost:
+    """USD spent by one external user inside a company window."""
+
+    id_external_user: int
+    cost_usd: float
+
+    def __init__(self, id_external_user: int, cost_usd: float):
+        self.id_external_user = id_external_user
+        self.cost_usd = cost_usd
+
+
+class CompanyCost:
+    """USD spent by a company's users inside a trailing window."""
+
+    id_external_company: int
+    cost_usd: float
+    users: list[UserCost]
+
+    def __init__(self, id_external_company: int, cost_usd: float, users: list[UserCost] | None = None):
+        self.id_external_company = id_external_company
+        self.cost_usd = cost_usd
+        self.users = list(users or [])

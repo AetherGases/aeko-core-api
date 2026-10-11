@@ -31,6 +31,15 @@ class Repository(IRepository):
         except Exception as e:
             raise RuntimeError(f"Error fetching aeko metrics from database: {e}")
 
+    @logged(Module.DATABASE, "aeko_metrics.get_company_metrics")
+    def get_company_metrics(self, id_external_company: int, since) -> list[Metric]:
+        """Retrieve metrics for one company at or after the supplied time."""
+        try:
+            query, projection = q.get_company_cost_query(id_external_company, since)
+            return [metric_from_data(data) for data in self.db[COLLECTION].find(query, projection)]
+        except Exception as e:
+            raise RuntimeError(f"Error fetching company aeko metrics from database: {e}")
+
 
 def agent_metric_from_data(data: dict) -> AgentMetric:
     """Map stored agent invocation data to an agent metric entity."""
@@ -52,5 +61,8 @@ def metric_from_data(data: dict) -> Metric:
         error_description=data.get("error_description"),
         flow=data.get("flow", ""),
         cost_usd=data.get("cost_usd", 0.0),
+        id_external_user=data.get("id_external_user"),
+        id_external_company=data.get("id_external_company"),
+        created_at=data.get("created_at"),
         used_agents=[agent_metric_from_data(agent) for agent in data.get("used_agents", [])],
     )

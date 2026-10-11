@@ -2,6 +2,8 @@
 
 import asyncio
 import re
+from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
@@ -38,6 +40,8 @@ AGENT_DOCUMENT = {
     "used_tools": ["climatiq_search", "calculator"],
 }
 
+CREATED_AT = datetime(2026, 10, 10, 12, 0, 0)
+
 METRIC_DOCUMENT = {
     "_id": "65a8b3d6c0f8e1d7f4b2c0bb",
     "id_request": "65a8b3d6c0f8e1d7f4b2c0aa",
@@ -45,6 +49,9 @@ METRIC_DOCUMENT = {
     "error_description": None,
     "flow": "conversational",
     "cost_usd": 0.000015,
+    "id_external_user": None,
+    "id_external_company": None,
+    "created_at": CREATED_AT,
     "used_agents": [AGENT_DOCUMENT],
 }
 
@@ -73,6 +80,9 @@ def build_metric(**overrides) -> Metric:
         "latency": 4823,
         "flow": "conversational",
         "cost_usd": 0.000015,
+        "id_external_user": None,
+        "id_external_company": None,
+        "created_at": CREATED_AT,
         "used_agents": [build_agent()],
     }
     fields.update(overrides)
@@ -216,6 +226,9 @@ def test_the_write_query_is_the_document_the_dashboard_reads():
         "error_description": None,
         "flow": "conversational",
         "cost_usd": 0.000015,
+        "id_external_user": None,
+        "id_external_company": None,
+        "created_at": CREATED_AT,
         "used_agents": [AGENT_DOCUMENT],
     }
 
@@ -349,6 +362,8 @@ class StubMetricsRepository:
         self.metrics = metrics or []
         self.error = error
         self.created = []
+        self.company_metrics = []
+        self.company_calls = []
 
     def create_metric(self, metric):
         """Persist a metric and return it with its database identifier."""
@@ -363,6 +378,13 @@ class StubMetricsRepository:
         if self.error is not None:
             raise self.error
         return self.metrics
+
+    def get_company_metrics(self, id_external_company, since):
+        """Retrieve metrics for one company at or after the supplied time."""
+        self.company_calls.append((id_external_company, since))
+        if self.error is not None:
+            raise self.error
+        return self.company_metrics
 
 
 def test_service_implements_the_service_interface():
@@ -664,14 +686,15 @@ def test_the_sink_writes_what_the_sdk_reported_into_the_collection(api_main):
     api_main.build_aeko_metrics_sink(database)(build_sdk_metrics())
 
     (document,) = database["aeko_metrics"].call_args("insert_one")[0]
-    assert document == {
-        "id_request": METRIC_DOCUMENT["id_request"],
-        "latency": 4823,
-        "error_description": None,
-        "flow": "conversational",
-        "cost_usd": 0.000015,
-        "used_agents": [AGENT_DOCUMENT],
-    }
+    assert document["id_request"] == METRIC_DOCUMENT["id_request"]
+    assert document["latency"] == 4823
+    assert document["error_description"] is None
+    assert document["flow"] == "conversational"
+    assert document["cost_usd"] == 0.000015
+    assert document["id_external_user"] is None
+    assert document["id_external_company"] is None
+    assert isinstance(document["created_at"], datetime)
+    assert document["used_agents"] == [AGENT_DOCUMENT]
 
 
 def test_the_sink_carries_a_failed_run_across(api_main):
@@ -684,3 +707,160 @@ def test_the_sink_carries_a_failed_run_across(api_main):
 
     (document,) = database["aeko_metrics"].call_args("insert_one")[0]
     assert document["error_description"] == "MalformedAgentOutputError: no sections"
+
+
+def test_a_metric_keeps_the_company_from_the_run():
+    """Verify that a metric keeps the company from the run."""
+    metric = build_metric(id_external_company=90, id_external_user=12345, created_at=CREATED_AT)
+
+    assert metric.id_external_company == 90
+    assert metric.id_external_user == 12345
+    assert metric.created_at == CREATED_AT
+
+
+def test_a_document_missing_owner_fields_reads_as_unset():
+    """Verify that a document missing owner fields reads as unset."""
+    metric = metric_from_data({"_id": "65a8b3d6c0f8e1d7f4b2c0bb"})
+
+    assert metric.id_external_company is None
+    assert metric.id_external_user is None
+    assert metric.created_at is None
+
+
+def test_the_company_cost_query_filters_company_and_recent_created_at():
+    """Verify that the company cost query filters company and recent created_at."""
+    since = CREATED_AT - timedelta(days=7)
+
+    assert q.get_company_cost_query(90, since) == (
+        {"id_external_company": 90, "created_at": {"$gte": since}},
+        {"id_external_user": 1, "cost_usd": 1},
+    )
+
+
+def test_reading_company_metrics_uses_the_company_cost_query():
+    """Verify that reading company metrics uses the company cost query."""
+    repository, collection = build_repository(StubCollection(find_result=[]))
+    since = CREATED_AT - timedelta(days=7)
+
+    repository.get_company_metrics(90, since)
+
+    assert collection.call_args("find") == [q.get_company_cost_query(90, since)]
+
+
+def test_company_cost_sums_each_user_and_the_company(monkeypatch):
+    """Verify that company cost sums each user and the company."""
+    monkeypatch.setattr(
+        "aeko_metrics.service.datetime",
+        SimpleNamespace(utcnow=lambda: CREATED_AT),
+    )
+    repository = StubMetricsRepository()
+    repository.company_metrics = [
+        build_metric(id_external_user=1, id_external_company=90, cost_usd=0.10, created_at=CREATED_AT),
+        build_metric(id_external_user=1, id_external_company=90, cost_usd=0.15, created_at=CREATED_AT),
+        build_metric(id_external_user=2, id_external_company=90, cost_usd=0.20, created_at=CREATED_AT),
+    ]
+
+    result = Service(repository).company_cost(7, 90)
+
+    assert repository.company_calls == [(90, CREATED_AT - timedelta(days=7))]
+    assert result.id_external_company == 90
+    assert result.cost_usd == 0.45
+    assert [(user.id_external_user, user.cost_usd) for user in result.users] == [(1, 0.25), (2, 0.20)]
+
+
+def test_company_cost_rejects_a_non_positive_window():
+    """Verify that company cost rejects a non positive window."""
+    with pytest.raises(ValueError, match="n"):
+        Service(StubMetricsRepository()).company_cost(0, 90)
+
+
+def test_company_cost_rejects_a_non_positive_company():
+    """Verify that company cost rejects a non positive company."""
+    with pytest.raises(ValueError, match="id_external_company"):
+        Service(StubMetricsRepository()).company_cost(7, 0)
+
+
+def test_company_cost_with_no_rows_is_zero():
+    """Verify that company cost with no rows is zero."""
+    repository = StubMetricsRepository()
+    repository.company_metrics = []
+
+    result = Service(repository).company_cost(7, 90)
+
+    assert result.id_external_company == 90
+    assert result.cost_usd == 0.0
+    assert result.users == []
+
+
+def test_company_cost_skips_runs_without_a_user():
+    """Verify that company cost skips runs without a user."""
+    repository = StubMetricsRepository()
+    repository.company_metrics = [
+        build_metric(id_external_user=None, id_external_company=90, cost_usd=9.0),
+        build_metric(id_external_user=1, id_external_company=90, cost_usd=0.10),
+    ]
+
+    result = Service(repository).company_cost(7, 90)
+
+    assert result.cost_usd == 0.1
+    assert [(user.id_external_user, user.cost_usd) for user in result.users] == [(1, 0.1)]
+
+
+def test_a_failed_company_cost_read_becomes_a_runtime_error():
+    """Verify that a failed company cost read becomes a runtime error."""
+    service = Service(StubMetricsRepository(error=RuntimeError("mongo is down")))
+
+    with pytest.raises(RuntimeError, match="Error retrieving company cost"):
+        service.company_cost(7, 90)
+
+
+def test_a_failed_company_metrics_fetch_is_a_database_error():
+    """Verify that a failed company metrics fetch is a database error."""
+    repository, _ = build_repository(StubCollection(error=RuntimeError("mongo is down")))
+
+    with pytest.raises(RuntimeError, match="Error fetching company aeko metrics from database"):
+        repository.get_company_metrics(90, CREATED_AT)
+
+
+def test_record_aeko_metrics_binds_the_company_for_the_sink():
+    """Verify that record aeko metrics binds the company for the sink."""
+    from internal.shared.event_tracking import (
+        current_metric_id_external_company,
+        current_metric_id_external_user,
+    )
+
+    seen = []
+
+    def sink(metrics):
+        """Capture the owner bound while the sink runs."""
+        seen.append(
+            (current_metric_id_external_user(), current_metric_id_external_company())
+        )
+
+    set_aeko_metrics_sink(sink)
+
+    assert record_aeko_metrics(
+        build_sdk_metrics(), id_external_user=12345, id_external_company=90
+    ) is True
+    assert seen == [(12345, 90)]
+    assert current_metric_id_external_user() is None
+    assert current_metric_id_external_company() is None
+
+
+def test_the_sink_stores_the_bound_company(api_main, monkeypatch):
+    """Verify that the sink stores the bound company."""
+    monkeypatch.setattr(
+        "aeko_metrics.database.query.datetime",
+        SimpleNamespace(utcnow=lambda: CREATED_AT),
+    )
+    database = StubDatabase(aeko_metrics=StubCollection())
+    set_aeko_metrics_sink(api_main.build_aeko_metrics_sink(database))
+
+    record_aeko_metrics(
+        build_sdk_metrics(), id_external_user=12345, id_external_company=90
+    )
+
+    (document,) = database["aeko_metrics"].call_args("insert_one")[0]
+    assert document["id_external_user"] == 12345
+    assert document["id_external_company"] == 90
+    assert document["created_at"] == CREATED_AT

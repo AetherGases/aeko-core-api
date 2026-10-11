@@ -21,6 +21,10 @@ from cmd.memory_generator_worker.constants import (
     SESSION_INACTIVITY_MINUTES,
 )
 from internal.shared import Module, operation, set_aeko_metrics_sink
+from internal.shared.event_tracking import (
+    current_metric_id_external_company,
+    current_metric_id_external_user,
+)
 from session.cache.repository import Repository as CacheRepository
 from session.database.repository import Repository as SessionRepository
 from session.memory_service import Service as MemoryService
@@ -61,6 +65,8 @@ def build_aeko_metrics_sink(database):
                     )
                     for agent in metrics.used_agents
                 ],
+                id_external_user=current_metric_id_external_user(),
+                id_external_company=current_metric_id_external_company(),
             )
         )
 

@@ -66,6 +66,67 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving user: Error fetching user from database: ...'
+  /aether-api/v1/ai/sessions/cost:
+    get:
+      tags:
+        - Sessions
+      summary: Sum session and SDK cost for a company
+      description: Returns USD spent in the last n days by runs that snapshotted the given company, grouped by external user.
+      operationId: getCompanySessionCost
+      parameters:
+        - name: n
+          in: query
+          required: true
+          description: Number of trailing days to include.
+          schema:
+            type: integer
+          example: 7
+        - name: id_external_company
+          in: query
+          required: true
+          description: External company identifier snapshotted on billed runs.
+          schema:
+            type: integer
+          example: 90
+      responses:
+        '200':
+          description: Company cost for the requested window.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyCostResponseData'
+              example:
+                id_external_company: 90
+                cost_usd: 0.45
+                users:
+                  - id_external_user: 1
+                    cost_usd: 0.25
+                  - id_external_user: 2
+                    cost_usd: 0.20
+        '400':
+          description: n or id_external_company is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: n must be a positive integer.
+        '503':
+          description: Database connection is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Database is not initialized
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: 'Error retrieving company cost: ...'
   /aether-api/v1/ai/sessions/user/{id_user}:
     get:
       tags:
@@ -471,6 +532,42 @@ components:
         - id_external_user
         - role
         - usecase
+    UserCostResponseData:
+      type: object
+      properties:
+        id_external_user:
+          type: integer
+          description: External user identifier whose runs were billed.
+          example: 12345
+        cost_usd:
+          type: number
+          format: float
+          description: USD spent by this user in the requested window.
+          example: 0.25
+      required:
+        - id_external_user
+        - cost_usd
+    CompanyCostResponseData:
+      type: object
+      properties:
+        id_external_company:
+          type: integer
+          description: External company identifier snapshotted on the billed runs.
+          example: 90
+        cost_usd:
+          type: number
+          format: float
+          description: USD spent by every user of this company in the requested window.
+          example: 0.45
+        users:
+          type: array
+          description: Per-user USD totals inside the same window.
+          items:
+            $ref: '#/components/schemas/UserCostResponseData'
+      required:
+        - id_external_company
+        - cost_usd
+        - users
     SessionResponseData:
       type: object
       properties:

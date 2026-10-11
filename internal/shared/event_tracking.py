@@ -70,6 +70,13 @@ _sink: Callable[[Event], Any] | None = None
 
 _aeko_sink: Callable[[Any], Any] | None = None
 
+_id_external_user: contextvars.ContextVar[int | None] = contextvars.ContextVar(
+    "aeko_id_external_user", default=None
+)
+_id_external_company: contextvars.ContextVar[int | None] = contextvars.ContextVar(
+    "aeko_id_external_company", default=None
+)
+
 
 def set_event_sink(sink: Callable[[Event], Any] | None) -> None:
     """Register the request metric callback, or disable persistence with None."""
@@ -85,7 +92,23 @@ def set_aeko_metrics_sink(sink: Callable[[Any], Any] | None) -> None:
     _aeko_sink = sink
 
 
-def record_aeko_metrics(metrics: Any) -> bool:
+def current_metric_id_external_user() -> int | None:
+    """Return the external user bound for the metric currently being recorded."""
+
+    return _id_external_user.get()
+
+
+def current_metric_id_external_company() -> int | None:
+    """Return the company snapshot bound for the metric currently being recorded."""
+
+    return _id_external_company.get()
+
+
+def record_aeko_metrics(
+    metrics: Any,
+    id_external_user: int | None = None,
+    id_external_company: int | None = None,
+) -> bool:
     """Submit SDK metrics to the sink and report success, logging and suppressing sink errors."""
 
     if metrics is None:
@@ -95,6 +118,8 @@ def record_aeko_metrics(metrics: Any) -> bool:
     if sink is None:
         return False
 
+    token_user = _id_external_user.set(id_external_user)
+    token_company = _id_external_company.set(id_external_company)
     try:
         sink(metrics)
     except Exception as exc:
@@ -103,6 +128,9 @@ def record_aeko_metrics(metrics: Any) -> bool:
             f"aeko_metrics.record gave up: {type(exc).__name__}: {exc}",
         )
         return False
+    finally:
+        _id_external_user.reset(token_user)
+        _id_external_company.reset(token_company)
 
     return True
 

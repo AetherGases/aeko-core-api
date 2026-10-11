@@ -70,9 +70,15 @@ class Service(IService):
             gases,
             scopes,
             categories,
+            id_external_user,
+            id_external_company,
         )
 
-        record_aeko_metrics(analysis.aeko_metrics)
+        record_aeko_metrics(
+            analysis.aeko_metrics,
+            id_external_user=id_external_user,
+            id_external_company=id_external_company,
+        )
 
         extracted_inventory = extracted_inventory_from_aeko(analysis.inventory)
 
@@ -114,7 +120,7 @@ def _current_plan(repository: IRepository, id_external_inventory: int) -> Improv
         return None
 
 
-def _analyze(analyzer, inventory_markdown: str, id_external_inventory: int, id_request: str, gases, scopes, categories):
+def _analyze(analyzer, inventory_markdown: str, id_external_inventory: int, id_request: str, gases, scopes, categories, id_external_user, id_external_company):
     """Analyze an inventory and record metrics attached to any raised exception."""
 
     try:
@@ -127,7 +133,11 @@ def _analyze(analyzer, inventory_markdown: str, id_external_inventory: int, id_r
             categories=categories,
         )
     except Exception as exc:
-        record_aeko_metrics(getattr(exc, "aeko_metrics", None))
+        record_aeko_metrics(
+            getattr(exc, "aeko_metrics", None),
+            id_external_user=id_external_user,
+            id_external_company=id_external_company,
+        )
         raise
 
 

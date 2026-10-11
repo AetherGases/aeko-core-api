@@ -44,6 +44,10 @@ from aeko_metrics.cost import cost_usd as usd_cost
 from aeko_metrics.database.repository import Repository as AekoMetricsRepository
 from aeko_metrics.entity import AgentMetric, Metric as AekoMetric
 from aeko_metrics.service import Service as AekoMetricsService
+from internal.shared.event_tracking import (
+    current_metric_id_external_company,
+    current_metric_id_external_user,
+)
 from hub_metrics.database.repository import Repository as HubMetricsRepository
 from hub_metrics.entity import Metric
 from hub_metrics.service import Service as HubMetricsService
@@ -342,6 +346,8 @@ def build_aeko_metrics_sink(database):
                 flow=metrics.flow,
                 cost_usd=usd_cost(agents, prices),
                 used_agents=agents,
+                id_external_user=current_metric_id_external_user(),
+                id_external_company=current_metric_id_external_company(),
             )
         )
 

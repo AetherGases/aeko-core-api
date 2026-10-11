@@ -2,10 +2,12 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 
+from aeko_metrics.aeko_metrics import IService as IAekoMetricsService
+from internal.http.aeko_metrics_handlers import get_aeko_metrics_service
 from session.database.repository import Repository
 from session.cache.repository import Repository as CacheRepository
 from session.service import Service
@@ -27,6 +29,23 @@ class MessageResponseData(BaseModel):
     output_message: str = Field(..., description="Output returned by the AI agent.", json_schema_extra={"example": "Here is the summary."})
     submitted_at: datetime = Field(..., description="Timestamp when the message was submitted.", json_schema_extra={"example": "2026-07-26T14:30:00Z"})
 
+    model_config = ConfigDict(frozen=True)
+
+
+class UserCostResponseData(BaseModel):
+    id_external_user: int = Field(..., description="External user identifier whose runs were billed.", json_schema_extra={"example": 12345})
+    cost_usd: float = Field(..., description="USD spent by this user in the requested window.", json_schema_extra={"example": 0.25})
+
+    model_config = ConfigDict(frozen=True)
+
+
+class CompanyCostResponseData(BaseModel):
+    id_external_company: int = Field(..., description="External company identifier snapshotted on the billed runs.", json_schema_extra={"example": 90})
+    cost_usd: float = Field(..., description="USD spent by every user of this company in the requested window.", json_schema_extra={"example": 0.45})
+    users: list[UserCostResponseData] = Field(..., description="Per-user USD totals inside the same window.")
+
+    model_config = ConfigDict(frozen=True)
+
 def get_session_service(request: Request) -> IService:
     """Build the session service from the application database and cache, or raise HTTP 503."""
     database = request.app.state.db
@@ -41,6 +60,57 @@ def get_session_service(request: Request) -> IService:
         cache_repository,
         inactivity_minutes=SESSION_INACTIVITY_MINUTES,
     )
+
+
+@router.get(
+    "/aether-api/v1/ai/sessions/cost",
+    response_model=CompanyCostResponseData,
+    summary="Sum session and SDK cost for a company",
+    description="Returns USD spent in the last n days by runs that snapshotted the given company, grouped by external user.",
+    responses={
+        200: {
+            "description": "Company cost for the requested window.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id_external_company": 90,
+                        "cost_usd": 0.45,
+                        "users": [
+                            {"id_external_user": 1, "cost_usd": 0.25},
+                            {"id_external_user": 2, "cost_usd": 0.20},
+                        ],
+                    }
+                }
+            },
+        },
+        400: {"description": "n or id_external_company is invalid."},
+        503: {"description": "Database connection is unavailable."},
+        500: {"description": "Unexpected server error."},
+    },
+)
+def get_company_cost(
+    n: int = Query(..., description="Number of trailing days to include.", examples=[7]),
+    id_external_company: int = Query(..., description="External company identifier snapshotted on billed runs.", examples=[90]),
+    service: IAekoMetricsService = Depends(get_aeko_metrics_service),
+) -> CompanyCostResponseData:
+    """Return USD spent by a company's users over the trailing n days."""
+    try:
+        result = service.company_cost(n, id_external_company)
+        return CompanyCostResponseData(
+            id_external_company=result.id_external_company,
+            cost_usd=result.cost_usd,
+            users=[
+                UserCostResponseData(
+                    id_external_user=user.id_external_user,
+                    cost_usd=user.cost_usd,
+                )
+                for user in result.users
+            ],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error retrieving company cost: {exc}") from exc
 
 
 @router.get(

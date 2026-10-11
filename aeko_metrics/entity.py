@@ -26,14 +26,17 @@ class Metric:
     latency: int
     error_description: str | None
     flow: str
+    cost_usd: float
     used_agents: list[AgentMetric]
 
     def __init__(self, id_request: str, latency: int, flow: str,
                  used_agents: list[AgentMetric] | None = None,
-                 error_description: str | None = None, id: str | None = None):
+                 error_description: str | None = None, id: str | None = None,
+                 cost_usd: float = 0.0):
         self.id = id
         self.id_request = id_request
         self.latency = latency
         self.error_description = error_description
         self.flow = flow
+        self.cost_usd = cost_usd
         self.used_agents = list(used_agents or [])

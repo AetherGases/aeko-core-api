@@ -23,6 +23,7 @@ from internal.shared.event_tracking import (
     Event,
     endpoint_of,
     new_id_request,
+    origin_of,
     record_event,
     set_event_sink,
 )
@@ -43,6 +44,7 @@ METRIC_DOCUMENT = {
     "latency": "12.4ms",
     "response_status": 200,
     "endpoint": USER_ROUTE_TEMPLATE,
+    "origin": "internal",
 }
 
 
@@ -52,6 +54,7 @@ def build_metric(**overrides) -> Metric:
         "latency": "12.4ms",
         "response_status": 200,
         "endpoint": USER_ROUTE_TEMPLATE,
+        "origin": "internal",
     }
     fields.update(overrides)
     return Metric(**fields)
@@ -112,6 +115,7 @@ def test_the_write_query_is_the_document_the_dashboard_reads():
         "latency": "12.4ms",
         "response_status": 200,
         "endpoint": USER_ROUTE_TEMPLATE,
+        "origin": "internal",
     }
 
 
@@ -184,6 +188,7 @@ def test_reading_the_metrics_maps_every_document():
     assert metric.latency == "12.4ms"
     assert metric.response_status == 200
     assert metric.endpoint == USER_ROUTE_TEMPLATE
+    assert metric.origin == "internal"
 
 
 def test_an_empty_collection_reads_as_an_empty_list():
@@ -295,6 +300,7 @@ EVENT = Event(
     latency="12.4ms",
     response_status=200,
     endpoint="/x",
+    origin="internal",
 )
 
 
@@ -668,6 +674,7 @@ def test_the_route_returns_every_row():
             "latency": "12.4ms",
             "response_status": 200,
             "endpoint": USER_ROUTE_TEMPLATE,
+            "origin": "internal",
         }
     ]
 
@@ -738,7 +745,67 @@ def test_every_request_of_the_real_application_lands_in_the_collection(api_main)
     assert stored[0]["response_status"] == 404
     assert stored[0]["endpoint"] == "/no-such-endpoint"
     assert stored[0]["latency"].endswith("ms")
+    assert stored[0]["origin"] == "internal"
     assert str(stored[0]["_id"])
+
+
+def test_the_mcp_root_path_is_openai():
+    """Verify that the MCP root path is openai."""
+    assert origin_of("/aether-api/v1/mcp") == "openai"
+
+
+def test_an_mcp_subpath_is_openai():
+    """Verify that an MCP subpath is openai."""
+    assert origin_of("/aether-api/v1/mcp/.well-known/oauth-protected-resource") == "openai"
+
+
+def test_an_mcp_trailing_slash_is_openai():
+    """Verify that an MCP trailing slash is openai."""
+    assert origin_of("/aether-api/v1/mcp/") == "openai"
+
+
+def test_a_lookalike_mcp_path_is_openai():
+    """Verify that any path containing mcp is openai."""
+    assert origin_of("/aether-api/v1/mcp-extra") == "openai"
+
+
+def test_a_path_that_only_contains_mcp_is_openai():
+    """Verify that a path is openai when it contains mcp without the API prefix."""
+    assert origin_of("/mcp") == "openai"
+
+
+def test_a_rest_path_is_internal():
+    """Verify that a REST path is internal."""
+    assert origin_of("/aether-api/v1/ai/user/12345") == "internal"
+
+
+def test_the_application_mcp_prefix_is_openai(api_main):
+    """Verify that the application MCP prefix is openai."""
+    assert origin_of(api_main.CHATGPT_MCP_PREFIX) == "openai"
+
+
+def test_a_mcp_request_is_stored_as_openai(recorded):
+    """Verify that an MCP request is stored as openai."""
+    asyncio.run(call(RequestLogMiddleware(build_app()), path="/aether-api/v1/mcp"))
+    assert recorded[0].origin == "openai"
+
+
+def test_a_rest_request_is_stored_as_internal(recorded):
+    """Verify that a REST request is stored as internal."""
+    asyncio.run(call(RequestLogMiddleware(build_app()), path="/aether-api/v1/ai/user/12345"))
+    assert recorded[0].origin == "internal"
+
+
+def test_a_document_missing_origin_reads_as_internal():
+    """Verify that a document missing origin reads as internal."""
+    assert metric_from_data({"_id": "1"}).origin == "internal"
+
+
+def test_the_route_returns_origin():
+    """Verify that the route returns origin."""
+    service = StubMetricsService([build_metric(id=METRIC_DOCUMENT["_id"])])
+    response = build_client(service).get(ROUTE)
+    assert response.json()[0]["origin"] == "internal"
 
 
 def test_a_tracked_request_records_the_route_template(api_main):

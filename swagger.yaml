@@ -379,6 +379,7 @@ paths:
                   latency: 12.4ms
                   response_status: 200
                   endpoint: /aether-api/v1/ai/user/{id_external_user}
+                  origin: internal
         '503':
           description: Database connection is unavailable.
           content:
@@ -417,6 +418,7 @@ paths:
                   latency: 4823
                   error_description: null
                   flow: conversational
+                  cost_usd: 0.000015
                   used_agents:
                     - name: Analista de Poluentes
                       input_tokens: 11
@@ -697,11 +699,16 @@ components:
           type: string
           description: Route template the request matched.
           example: /aether-api/v1/ai/user/{id_external_user}
+        origin:
+          type: string
+          description: Whether the request came from the ChatGPT MCP plugin or the internal HTTP API.
+          example: internal
       required:
         - id
         - latency
         - response_status
         - endpoint
+        - origin
     AgentMetricResponseData:
       type: object
       properties:
@@ -762,6 +769,10 @@ components:
             - conversational
             - analytical
           example: conversational
+        cost_usd:
+          type: number
+          description: Estimated USD cost of the run from token usage and the configured per-model price table.
+          example: 0.000015
         used_agents:
           type: array
           items:
@@ -772,4 +783,5 @@ components:
         - id_request
         - latency
         - flow
+        - cost_usd
         - used_agents

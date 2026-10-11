@@ -11,6 +11,7 @@ def create_metric_query(metric: Metric) -> dict:
         "latency": metric.latency,
         "error_description": metric.error_description,
         "flow": metric.flow,
+        "cost_usd": metric.cost_usd,
         "used_agents": [
             {
                 "name": agent.name,

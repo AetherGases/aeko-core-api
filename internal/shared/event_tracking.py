@@ -25,12 +25,21 @@ from internal.shared.constants import (
 
 @dataclass(frozen=True)
 class Event:
-    """One finished request, in the four fields `hub_metrics` stores."""
+    """One finished request, in the fields `hub_metrics` stores."""
 
     id_request: str
     latency: str
     response_status: int
     endpoint: str
+    origin: str
+
+
+def origin_of(path: str) -> str:
+    """Return openai for ChatGPT MCP paths and internal for all other HTTP paths."""
+
+    if "mcp" in path:
+        return "openai"
+    return "internal"
 
 
 _id_request: contextvars.ContextVar[str] = contextvars.ContextVar(

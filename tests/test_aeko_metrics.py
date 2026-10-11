@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from aeko_metrics.aeko_metrics import IRepository, IService
+from aeko_metrics.cost import cost_usd
 from aeko_metrics.database import query as q
 from aeko_metrics.database.repository import Repository, metric_from_data
 from aeko_metrics.entity import AgentMetric, Metric
@@ -43,7 +44,12 @@ METRIC_DOCUMENT = {
     "latency": 4823,
     "error_description": None,
     "flow": "conversational",
+    "cost_usd": 0.000015,
     "used_agents": [AGENT_DOCUMENT],
+}
+
+PRICES = {
+    "gemini-3.5-flash": {"input_per_million": 0.15, "output_per_million": 0.60},
 }
 
 
@@ -66,6 +72,7 @@ def build_metric(**overrides) -> Metric:
         "id_request": METRIC_DOCUMENT["id_request"],
         "latency": 4823,
         "flow": "conversational",
+        "cost_usd": 0.000015,
         "used_agents": [build_agent()],
     }
     fields.update(overrides)
@@ -173,6 +180,32 @@ def test_an_agent_that_reached_for_no_tool_lists_none():
     assert AgentMetric(name="FAQ").used_tools == []
 
 
+def test_cost_usd_is_tokens_times_price_per_million():
+    """Verify that cost_usd is tokens times price per million."""
+    agents = [build_agent(input_tokens=1_000_000, output_tokens=1_000_000, llm="gemini-3.5-flash")]
+    assert cost_usd(agents, PRICES) == 0.75
+
+
+def test_cost_usd_sums_every_invocation():
+    """Verify that cost_usd sums every invocation."""
+    agents = [
+        build_agent(input_tokens=1_000_000, output_tokens=0, llm="gemini-3.5-flash"),
+        build_agent(input_tokens=1_000_000, output_tokens=0, llm="gemini-3.5-flash"),
+    ]
+    assert cost_usd(agents, PRICES) == 0.3
+
+
+def test_an_unknown_model_contributes_zero():
+    """Verify that an unknown model contributes zero."""
+    agents = [build_agent(input_tokens=1_000_000, output_tokens=1_000_000, llm="mystery-model")]
+    assert cost_usd(agents, PRICES) == 0.0
+
+
+def test_a_document_missing_cost_usd_reads_as_zero():
+    """Verify that a document missing cost_usd reads as zero."""
+    assert metric_from_data({"_id": "65a8b3d6c0f8e1d7f4b2c0bb"}).cost_usd == 0.0
+
+
 def test_the_write_query_is_the_document_the_dashboard_reads():
     """Verify that the write query is the document the dashboard reads."""
     document = q.create_metric_query(build_metric())
@@ -182,6 +215,7 @@ def test_the_write_query_is_the_document_the_dashboard_reads():
         "latency": 4823,
         "error_description": None,
         "flow": "conversational",
+        "cost_usd": 0.000015,
         "used_agents": [AGENT_DOCUMENT],
     }
 
@@ -550,6 +584,7 @@ def test_the_route_returns_every_row():
             "latency": 4823,
             "error_description": None,
             "flow": "conversational",
+            "cost_usd": 0.000015,
             "used_agents": [AGENT_DOCUMENT],
         }
     ]
@@ -634,6 +669,7 @@ def test_the_sink_writes_what_the_sdk_reported_into_the_collection(api_main):
         "latency": 4823,
         "error_description": None,
         "flow": "conversational",
+        "cost_usd": 0.000015,
         "used_agents": [AGENT_DOCUMENT],
     }
 

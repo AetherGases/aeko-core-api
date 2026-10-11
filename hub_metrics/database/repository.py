@@ -39,4 +39,5 @@ def metric_from_data(data: dict) -> Metric:
         latency=data.get("latency", ""),
         response_status=data.get("response_status", 0),
         endpoint=data.get("endpoint", ""),
+        origin=data.get("origin", "internal"),
     )

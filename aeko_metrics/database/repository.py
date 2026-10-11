@@ -51,5 +51,6 @@ def metric_from_data(data: dict) -> Metric:
         latency=data.get("latency", 0),
         error_description=data.get("error_description"),
         flow=data.get("flow", ""),
+        cost_usd=data.get("cost_usd", 0.0),
         used_agents=[agent_metric_from_data(agent) for agent in data.get("used_agents", [])],
     )

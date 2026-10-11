@@ -25,6 +25,7 @@ class AekoMetricResponseData(BaseModel):
     latency: int = Field(..., description="How long the whole SDK run took, in whole milliseconds.", json_schema_extra={"example": 4823})
     error_description: str | None = Field(None, description="Why the run failed, or null when it did not. A conversational turn no reviewer approved is one of these: it delivers nothing, and this row is the only account left of what it cost.", json_schema_extra={"example": None})
     flow: str = Field(..., description="Which entry point served it: conversational for a chat turn, analytical for an inventory analysis.", json_schema_extra={"example": "conversational"})
+    cost_usd: float = Field(..., description="Estimated USD cost of the run from token usage and the configured per-model price table.", json_schema_extra={"example": 0.000015})
     used_agents: list[AgentMetricResponseData] = Field(..., description="One entry per agent invocation, in call order. An agent a reviewer's retry loop called again is listed again.")
 
     model_config = ConfigDict(frozen=True)
@@ -55,6 +56,7 @@ def get_aeko_metrics_service(request: Request) -> IService:
                             "latency": 4823,
                             "error_description": None,
                             "flow": "conversational",
+                            "cost_usd": 0.000015,
                             "used_agents": [
                                 {
                                     "name": "Analista de Poluentes",
@@ -85,6 +87,7 @@ def get_all_metrics(
                 latency=metric.latency,
                 error_description=metric.error_description,
                 flow=metric.flow,
+                cost_usd=metric.cost_usd,
                 used_agents=[
                     AgentMetricResponseData(
                         name=agent.name,

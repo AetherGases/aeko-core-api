@@ -14,6 +14,7 @@ class MetricResponseData(BaseModel):
     latency: str = Field(..., description="How long the request took, in milliseconds.", json_schema_extra={"example": "12.4ms"})
     response_status: int = Field(..., description="HTTP status the request answered with.", json_schema_extra={"example": 200})
     endpoint: str = Field(..., description="Route template the request matched.", json_schema_extra={"example": "/aether-api/v1/ai/user/{id_external_user}"})
+    origin: str = Field(..., description="Whether the request came from the ChatGPT MCP plugin or the internal HTTP API.", json_schema_extra={"example": "internal"})
 
     model_config = ConfigDict(frozen=True)
 
@@ -42,6 +43,7 @@ def get_hub_metrics_service(request: Request) -> IService:
                             "latency": "12.4ms",
                             "response_status": 200,
                             "endpoint": "/aether-api/v1/ai/user/{id_external_user}",
+                            "origin": "internal",
                         }
                     ]
                 }
@@ -62,6 +64,7 @@ def get_all_metrics(
                 latency=metric.latency,
                 response_status=metric.response_status,
                 endpoint=metric.endpoint,
+                origin=metric.origin,
             )
             for metric in service.get_all_metrics()
         ]

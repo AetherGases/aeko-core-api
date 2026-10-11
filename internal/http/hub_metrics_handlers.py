@@ -13,7 +13,7 @@ class MetricResponseData(BaseModel):
     id: str = Field(..., description="Identifier of the tracked request, answered to its caller in the X-Request-Id header.", json_schema_extra={"example": "65a8b3d6c0f8e1d7f4b2c0aa"})
     latency: str = Field(..., description="How long the request took, in milliseconds.", json_schema_extra={"example": "12.4ms"})
     response_status: int = Field(..., description="HTTP status the request answered with.", json_schema_extra={"example": 200})
-    endpoint: str = Field(..., description="Route template the request matched.", json_schema_extra={"example": "/aether-api/v1/ai/user/{id_external_user}"})
+    endpoint: str = Field(..., description="Route template the request matched.", json_schema_extra={"example": "/ai/user/{id_external_user}"})
     origin: str = Field(..., description="Whether the request came from the ChatGPT MCP plugin or the internal HTTP API.", json_schema_extra={"example": "internal"})
 
     model_config = ConfigDict(frozen=True)
@@ -28,7 +28,7 @@ def get_hub_metrics_service(request: Request) -> IService:
 
 
 @router.get(
-    "/aether-api/v1/ai/hub-metrics",
+    "/ai/hub-metrics",
     response_model=list[MetricResponseData],
     summary="List every tracked request",
     description="Returns the whole event tracking base: one row per request served by the gateway, as the observability dashboard reads it.",
@@ -42,7 +42,7 @@ def get_hub_metrics_service(request: Request) -> IService:
                             "id": "65a8b3d6c0f8e1d7f4b2c0aa",
                             "latency": "12.4ms",
                             "response_status": 200,
-                            "endpoint": "/aether-api/v1/ai/user/{id_external_user}",
+                            "endpoint": "/ai/user/{id_external_user}",
                             "origin": "internal",
                         }
                     ]

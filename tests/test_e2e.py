@@ -244,12 +244,12 @@ def report_app(live_app, monkeypatch):
 
 def request_report(client, body=None):
     """Submit a report request to the test application."""
-    return client.post("/aether-api/v1/ai/report", json=body or REPORT_BODY)
+    return client.post("/ai/report", json=body or REPORT_BODY)
 
 
 def get_report(client, id_external_inventory=ID_INVENTORY):
     """Read the stored textual plan for an inventory."""
-    return client.get(f"/aether-api/v1/ai/report/{id_external_inventory}")
+    return client.get(f"/ai/report/{id_external_inventory}")
 
 
 def test_lifespan_configures_the_sdk_from_environment(live_app, fake_sdk):
@@ -611,7 +611,7 @@ def test_lifespan_starts_even_when_an_mcp_server_refuses_to(api_main, monkeypatc
     monkeypatch.setattr(api_main, "MCP_WARM_UP", "true")
 
     with TestClient(api_main.app) as client:
-        assert client.get("/aether-api/v1/ai/user/12345").status_code in (200, 404, 503)
+        assert client.get("/ai/user/12345").status_code in (200, 404, 503)
         assert printed_within(capsys, "CHROMA_API_KEY")
 
 
@@ -635,16 +635,16 @@ def test_journey_user_then_sessions_then_messages(live_app):
     """Verify that journey user then sessions then messages."""
     client, _, _, _ = live_app
 
-    user = client.get("/aether-api/v1/ai/user/12345")
+    user = client.get("/ai/user/12345")
     assert user.status_code == 200
     assert user.json()["role"] == "analyst"
 
-    sessions = client.get("/aether-api/v1/ai/sessions/user/u1")
+    sessions = client.get("/ai/sessions/user/u1")
     assert sessions.status_code == 200
     assert sessions.json() == [{"id": "s1", "name": "Weekly emissions review"}]
 
     id_session = sessions.json()[0]["id"]
-    messages = client.get(f"/aether-api/v1/ai/session/{id_session}/messages")
+    messages = client.get(f"/ai/session/{id_session}/messages")
     assert messages.status_code == 200
     assert messages.json() == [
         {
@@ -659,13 +659,13 @@ def test_journey_unknown_user_is_404(live_app):
     """Verify that journey unknown user is 404."""
     client, _, _, _ = live_app
 
-    assert client.get("/aether-api/v1/ai/user/99999").status_code == 404
-    assert client.get("/aether-api/v1/ai/sessions/user/ghost").status_code == 404
+    assert client.get("/ai/user/99999").status_code == 404
+    assert client.get("/ai/sessions/user/ghost").status_code == 404
 
 
 def send(client, **body):
     """Send or capture the request messages used by the test."""
-    return client.post("/aether-api/v1/ai/user/session/message", json=body)
+    return client.post("/ai/user/session/message", json=body)
 
 
 def test_send_message_completes_the_round_trip(live_app):
@@ -897,7 +897,7 @@ def test_get_report_records_hub_metrics_and_no_aeko_metrics(report_app):
     assert stored_metrics(api_main) == []
     (request_row,) = list(api_main.db["hub_metrics"].documents)
     assert request_row["response_status"] == 200
-    assert request_row["endpoint"] == "/aether-api/v1/ai/report/{id_external_inventory}"
+    assert request_row["endpoint"] == "/ai/report/{id_external_inventory}"
 
 
 def test_post_report_records_hub_metrics_for_the_post_template(report_app):
@@ -909,7 +909,7 @@ def test_post_report_records_hub_metrics_for_the_post_template(report_app):
     assert response.status_code == 200
     (request_row,) = list(api_main.db["hub_metrics"].documents)
     assert request_row["response_status"] == 200
-    assert request_row["endpoint"] == "/aether-api/v1/ai/report"
+    assert request_row["endpoint"] == "/ai/report"
 
 
 def test_an_empty_inventory_is_400_and_does_not_call_aeko(report_app, fake_sdk):
@@ -987,7 +987,7 @@ def test_a_request_that_never_reached_the_sdk_records_no_run(live_app):
     """Verify that a request that never reached the sdk records no run."""
     client, api_main, _, _ = live_app
 
-    client.get("/aether-api/v1/ai/sessions/user/u1")
+    client.get("/ai/sessions/user/u1")
 
     assert stored_metrics(api_main) == []
 

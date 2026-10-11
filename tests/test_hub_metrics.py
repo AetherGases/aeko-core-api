@@ -32,12 +32,12 @@ from internal.shared.operation import operation
 from internal.shared.request_log import RequestLogMiddleware
 from tests.mongo_doubles import StubCollection, StubDatabase
 
-ROUTE = "/aether-api/v1/ai/hub-metrics"
+ROUTE = "/ai/hub-metrics"
 
 HEADER = re.compile(r"^\[aeko-hub\] \[request\] \[[^\]]+\] (?P<description>.*)$")
 LINE = re.compile(r"^\[aeko-hub\] \[(?P<module>\w+)\] \[[^\]]+\] (?P<description>.*)$")
 
-USER_ROUTE_TEMPLATE = "/aether-api/v1/ai/user/{id_external_user}"
+USER_ROUTE_TEMPLATE = "/ai/user/{id_external_user}"
 
 METRIC_DOCUMENT = {
     "_id": "65a8b3d6c0f8e1d7f4b2c0aa",
@@ -363,7 +363,7 @@ def test_the_endpoint_is_the_route_template_not_the_path_that_was_asked_for():
     """Verify that the endpoint is the route template not the path that was asked for."""
     scope = {
         "type": "http",
-        "path": "/aether-api/v1/ai/user/12345",
+        "path": "/ai/user/12345",
         "route": SimpleNamespace(path=USER_ROUTE_TEMPLATE),
     }
 
@@ -627,7 +627,7 @@ def test_a_response_that_never_started_has_nowhere_to_carry_it():
 def test_the_real_application_answers_with_the_identifier_of_the_stored_row(api_main):
     """Verify that the real application answers with the identifier of the stored row."""
     with TestClient(api_main.app) as client:
-        response = client.get("/aether-api/v1/ai/user/12345")
+        response = client.get("/ai/user/12345")
         stored = list(api_main.db["hub_metrics"].documents)
 
     assert response.headers["X-Request-Id"] == str(stored[0]["_id"])
@@ -751,22 +751,22 @@ def test_every_request_of_the_real_application_lands_in_the_collection(api_main)
 
 def test_the_mcp_root_path_is_openai():
     """Verify that the MCP root path is openai."""
-    assert origin_of("/aether-api/v1/mcp") == "openai"
+    assert origin_of("/ai/mcp") == "openai"
 
 
 def test_an_mcp_subpath_is_openai():
     """Verify that an MCP subpath is openai."""
-    assert origin_of("/aether-api/v1/mcp/.well-known/oauth-protected-resource") == "openai"
+    assert origin_of("/ai/mcp/.well-known/oauth-protected-resource") == "openai"
 
 
 def test_an_mcp_trailing_slash_is_openai():
     """Verify that an MCP trailing slash is openai."""
-    assert origin_of("/aether-api/v1/mcp/") == "openai"
+    assert origin_of("/ai/mcp/") == "openai"
 
 
 def test_a_lookalike_mcp_path_is_openai():
     """Verify that any path containing mcp is openai."""
-    assert origin_of("/aether-api/v1/mcp-extra") == "openai"
+    assert origin_of("/ai/mcp-extra") == "openai"
 
 
 def test_a_path_that_only_contains_mcp_is_openai():
@@ -776,7 +776,7 @@ def test_a_path_that_only_contains_mcp_is_openai():
 
 def test_a_rest_path_is_internal():
     """Verify that a REST path is internal."""
-    assert origin_of("/aether-api/v1/ai/user/12345") == "internal"
+    assert origin_of("/ai/user/12345") == "internal"
 
 
 def test_the_application_mcp_prefix_is_openai(api_main):
@@ -786,13 +786,13 @@ def test_the_application_mcp_prefix_is_openai(api_main):
 
 def test_a_mcp_request_is_stored_as_openai(recorded):
     """Verify that an MCP request is stored as openai."""
-    asyncio.run(call(RequestLogMiddleware(build_app()), path="/aether-api/v1/mcp"))
+    asyncio.run(call(RequestLogMiddleware(build_app()), path="/ai/mcp"))
     assert recorded[0].origin == "openai"
 
 
 def test_a_rest_request_is_stored_as_internal(recorded):
     """Verify that a REST request is stored as internal."""
-    asyncio.run(call(RequestLogMiddleware(build_app()), path="/aether-api/v1/ai/user/12345"))
+    asyncio.run(call(RequestLogMiddleware(build_app()), path="/ai/user/12345"))
     assert recorded[0].origin == "internal"
 
 
@@ -811,7 +811,7 @@ def test_the_route_returns_origin():
 def test_a_tracked_request_records_the_route_template(api_main):
     """Verify that a tracked request records the route template."""
     with TestClient(api_main.app) as client:
-        client.get("/aether-api/v1/ai/user/12345")
+        client.get("/ai/user/12345")
         stored = list(api_main.db["hub_metrics"].documents)
 
     assert stored[0]["endpoint"] == USER_ROUTE_TEMPLATE

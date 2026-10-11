@@ -9,10 +9,10 @@ from internal.http import upload_ticket_handlers
 from upload_ticket.entity import STATE_UPLOADED, UploadTicket
 
 SIGNATURE_ROUTE = (
-    "/aether-api/v1/ai/user/{id_external_user}/inventory-upload/{ticket}/signature"
+    "/ai/user/{id_external_user}/inventory-upload/{ticket}/signature"
 )
 COMPLETE_ROUTE = (
-    "/aether-api/v1/ai/user/{id_external_user}/inventory-upload/{ticket}/complete"
+    "/ai/user/{id_external_user}/inventory-upload/{ticket}/complete"
 )
 
 SIGNATURE_PAYLOAD = {

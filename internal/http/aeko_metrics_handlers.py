@@ -40,7 +40,7 @@ def get_aeko_metrics_service(request: Request) -> IService:
 
 
 @router.get(
-    "/aether-api/v1/ai/aeko-metrics",
+    "/ai/aeko-metrics",
     response_model=list[AekoMetricResponseData],
     summary="List what every AI run cost",
     description="Returns the whole Aeko event tracking base: one row per SDK run served by the gateway, with the agents it invoked, as the observability dashboard reads it.",

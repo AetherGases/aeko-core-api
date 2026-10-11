@@ -22,7 +22,7 @@ _WIDGETS_DIR = (
 )
 _SIGN_IN_TEMPLATE_PATH = _WIDGETS_DIR / "oauth_sign_in.html"
 _MASCOT_PATH = _WIDGETS_DIR / "ic_aeko_mascot.png"
-MASCOT_PATH = "/aether-api/v1/oauth/ic_aeko_mascot.png"
+MASCOT_PATH = "/ai/oauth/ic_aeko_mascot.png"
 
 
 def _sign_in_template() -> str:

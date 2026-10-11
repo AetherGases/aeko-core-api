@@ -133,7 +133,7 @@ def _http_status_for_value_error(exc: ValueError) -> int:
 
 
 @router.post(
-    "/aether-api/v1/ai/report",
+    "/ai/report",
     response_model=ExtractedInventoryData,
     summary="Analyze an inventory and return the structured extraction",
     description=(
@@ -207,7 +207,7 @@ async def input_report(
 
 
 @router.get(
-    "/aether-api/v1/ai/report/{id_external_inventory}",
+    "/ai/report/{id_external_inventory}",
     response_model=ImprovementPlanReportData,
     summary="Get the textual improvement plan for an inventory",
     description="Returns the stored improvement plan for the external inventory identifier.",

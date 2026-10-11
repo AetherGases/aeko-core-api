@@ -173,7 +173,7 @@ AEKO_TOOLS = {
 
 MCP_SESSIONS = (CHROMA_SESSION,)
 
-CHATGPT_MCP_PREFIX = "/aether-api/v1/mcp"
+CHATGPT_MCP_PREFIX = "/ai/mcp"
 
 chatgpt_mcp = build_mcp_server()
 chatgpt_mcp_app = wrap_mcp_auth(chatgpt_mcp.streamable_http_app())

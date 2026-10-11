@@ -63,7 +63,7 @@ def get_session_service(request: Request) -> IService:
 
 
 @router.get(
-    "/aether-api/v1/ai/sessions/cost",
+    "/ai/sessions/cost",
     response_model=CompanyCostResponseData,
     summary="Sum session and SDK cost for a company",
     description="Returns USD spent in the last n days by runs that snapshotted the given company, grouped by external user.",
@@ -114,7 +114,7 @@ def get_company_cost(
 
 
 @router.get(
-    "/aether-api/v1/ai/sessions/user/{id_user}",
+    "/ai/sessions/user/{id_user}",
     response_model=list[SessionResponseData],
     summary="List sessions for a user",
     description="Returns all sessions associated with the internal user identifier.",
@@ -151,7 +151,7 @@ def get_user_sessions(
         raise HTTPException(status_code=500, detail=f"Error retrieving user sessions: {exc}") from exc
 
 @router.get(
-    "/aether-api/v1/ai/session/{id_session}/messages",
+    "/ai/session/{id_session}/messages",
     response_model=list[MessageResponseData],
     summary="List messages for a session",
     description="Returns the message history stored for a specific session.",
@@ -196,7 +196,7 @@ def get_session_messages(
         raise HTTPException(status_code=500, detail=f"Error retrieving session messages: {exc}") from exc
 
 @router.post(
-    "/aether-api/v1/ai/user/session/message",
+    "/ai/user/session/message",
     summary="Send a message to the AI session",
     description="Creates or continues a session message exchange using the current Aeko messenger instance.",
     tags=["Sessions"],

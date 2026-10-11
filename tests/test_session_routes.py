@@ -11,9 +11,9 @@ from internal.http import session_handlers
 from session.entity import Message, Session
 from session.session import GuardrailRejectedError
 
-SESSIONS_ROUTE = "/aether-api/v1/ai/sessions/user/{id_user}"
-MESSAGES_ROUTE = "/aether-api/v1/ai/session/{id_session}/messages"
-SEND_ROUTE = "/aether-api/v1/ai/user/session/message"
+SESSIONS_ROUTE = "/ai/sessions/user/{id_user}"
+MESSAGES_ROUTE = "/ai/session/{id_session}/messages"
+SEND_ROUTE = "/ai/user/session/message"
 
 SUBMITTED_AT = datetime(2026, 7, 26, 14, 30, 0)
 
@@ -274,7 +274,7 @@ def test_send_message_maps_unexpected_error_to_500(patched_user_repository):
     assert "boom" in response.json()["detail"]
 
 
-COST_ROUTE = "/aether-api/v1/ai/sessions/cost"
+COST_ROUTE = "/ai/sessions/cost"
 
 
 class StubMetricsService:

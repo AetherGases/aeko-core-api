@@ -28,7 +28,7 @@ from internal.shared.request_log import RequestLogMiddleware
 from tests import fake_aeko
 from tests.mongo_doubles import StubCollection, StubDatabase
 
-ROUTE = "/aether-api/v1/ai/aeko-metrics"
+ROUTE = "/ai/aeko-metrics"
 
 LINE = re.compile(r"^\[aeko-hub\] \[(?P<module>\w+)\] \[[^\]]+\] (?P<description>.*)$")
 
@@ -495,7 +495,7 @@ def build_app(seen):
     return RequestLogMiddleware(app)
 
 
-def call(app, path="/aether-api/v1/ai/ping"):
+def call(app, path="/ai/ping"):
     """Invoke the ASGI application with a simulated request scope."""
     sent = []
 

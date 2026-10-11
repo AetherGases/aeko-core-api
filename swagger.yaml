@@ -16,7 +16,7 @@ tags:
     description: 'Endpoints for reading the event tracking bases behind the observability dashboard: what the gateway did with each request, and what the AI run inside it cost.'
 
 paths:
-  /aether-api/v1/ai/user/{id_external_user}:
+  /ai/user/{id_external_user}:
     get:
       tags:
         - Users
@@ -66,7 +66,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving user: Error fetching user from database: ...'
-  /aether-api/v1/ai/sessions/cost:
+  /ai/sessions/cost:
     get:
       tags:
         - Sessions
@@ -127,7 +127,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving company cost: ...'
-  /aether-api/v1/ai/sessions/user/{id_user}:
+  /ai/sessions/user/{id_user}:
     get:
       tags:
         - Sessions
@@ -178,7 +178,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving user sessions: ...'
-  /aether-api/v1/ai/session/{id_session}/messages:
+  /ai/session/{id_session}/messages:
     get:
       tags:
         - Sessions
@@ -230,7 +230,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving session messages: ...'
-  /aether-api/v1/ai/user/session/message:
+  /ai/user/session/message:
     post:
       tags:
         - Sessions
@@ -282,7 +282,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: Aeko SDK is not initialized
-  /aether-api/v1/ai/report:
+  /ai/report:
     post:
       tags:
         - Reports
@@ -369,7 +369,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error processing report: ...'
-  /aether-api/v1/ai/report/{id_external_inventory}:
+  /ai/report/{id_external_inventory}:
     get:
       tags:
         - Reports
@@ -419,7 +419,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving report: ...'
-  /aether-api/v1/ai/hub-metrics:
+  /ai/hub-metrics:
     get:
       tags:
         - Metrics
@@ -439,7 +439,7 @@ paths:
                 - id: 65a8b3d6c0f8e1d7f4b2c0aa
                   latency: 12.4ms
                   response_status: 200
-                  endpoint: /aether-api/v1/ai/user/{id_external_user}
+                  endpoint: /ai/user/{id_external_user}
                   origin: internal
         '503':
           description: Database connection is unavailable.
@@ -457,7 +457,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving metrics: ...'
-  /aether-api/v1/ai/aeko-metrics:
+  /ai/aeko-metrics:
     get:
       tags:
         - Metrics
@@ -795,7 +795,7 @@ components:
         endpoint:
           type: string
           description: Route template the request matched.
-          example: /aether-api/v1/ai/user/{id_external_user}
+          example: /ai/user/{id_external_user}
         origin:
           type: string
           description: Whether the request came from the ChatGPT MCP plugin or the internal HTTP API.

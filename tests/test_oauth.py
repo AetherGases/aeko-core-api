@@ -41,7 +41,7 @@ def oauth_env(monkeypatch):
     """Set OAuth authorization-server environment variables for the test."""
     monkeypatch.setenv("OAUTH_SIGNING_KEY", "test-signing-key")
     monkeypatch.setenv("OAUTH_ISSUER", "https://aeko.example.com")
-    monkeypatch.setenv("OAUTH_AUDIENCE", "https://aeko.example.com/aether-api/v1/mcp/")
+    monkeypatch.setenv("OAUTH_AUDIENCE", "https://aeko.example.com/ai/mcp/")
     monkeypatch.setenv("OAUTH_CLIENT_ID", "chatgpt")
     monkeypatch.setenv("OAUTH_AUTHORIZATION_CODE_TTL_SECONDS", "300")
     monkeypatch.setenv("OAUTH_ACCESS_TOKEN_TTL_SECONDS", "3600")

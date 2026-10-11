@@ -51,7 +51,7 @@ def _raise_for_value_error(exc: ValueError) -> None:
 
 
 @router.get(
-    "/aether-api/v1/ai/user/{id_external_user}/inventory-upload/{ticket}/signature",
+    "/ai/user/{id_external_user}/inventory-upload/{ticket}/signature",
     summary="Redeem an upload ticket for a Cloudinary signature",
     description=(
         "Returns the Cloudinary upload signature for an inventory upload ticket "
@@ -109,7 +109,7 @@ def get_upload_signature(
 
 
 @router.post(
-    "/aether-api/v1/ai/user/{id_external_user}/inventory-upload/{ticket}/complete",
+    "/ai/user/{id_external_user}/inventory-upload/{ticket}/complete",
     response_model=CompleteResponse,
     summary="Confirm the uploaded inventory file path",
     description=(

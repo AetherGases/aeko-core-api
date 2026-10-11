@@ -17,8 +17,8 @@ from tests.mongo_doubles import StubCollection, StubDatabase
 from user.database.repository import Repository as UserRepository
 from user.service import Service as UserService
 
-REPORT_ROUTE = "/aether-api/v1/ai/report"
-SEND_MESSAGE_ROUTE = "/aether-api/v1/ai/user/session/message"
+REPORT_ROUTE = "/ai/report"
+SEND_MESSAGE_ROUTE = "/ai/user/session/message"
 ID_SESSION = "65a8b3d6c0f8e1d7f4b2c001"
 ID_USER = "65a8b3d6c0f8e1d7f4b2c010"
 
@@ -41,9 +41,9 @@ def request_with(db):
     return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(db=db)))
 
 
-def test_mcp_sessions_are_tavily_and_chroma(api_main):
-    """Verify that mcp sessions are tavily and chroma."""
-    assert [session.name for session in api_main.MCP_SESSIONS] == ["tavily", "chroma"]
+def test_mcp_sessions_are_chroma_only(api_main):
+    """Verify that mcp sessions are chroma only."""
+    assert [session.name for session in api_main.MCP_SESSIONS] == ["chroma"]
 
 
 def test_report_route_is_registered_on_the_application(api_main):
@@ -51,22 +51,23 @@ def test_report_route_is_registered_on_the_application(api_main):
     paths = api_main.app.openapi()["paths"]
 
     assert "post" in paths.get(REPORT_ROUTE, {})
-    assert "get" in paths.get("/aether-api/v1/ai/report/{id_external_inventory}", {})
+    assert "get" in paths.get("/ai/report/{id_external_inventory}", {})
 
 
 @pytest.mark.parametrize(
     "path",
     [
-        "/aether-api/v1/ai/user/{id_external_user}",
-        "/aether-api/v1/ai/sessions/user/{id_user}",
-        "/aether-api/v1/ai/session/{id_session}/messages",
+        "/ai/user/{id_external_user}",
+        "/ai/sessions/cost",
+        "/ai/sessions/user/{id_user}",
+        "/ai/session/{id_session}/messages",
         SEND_MESSAGE_ROUTE,
-        "/aether-api/v1/ai/user/{id_external_user}/inventory-upload/{ticket}/signature",
-        "/aether-api/v1/ai/user/{id_external_user}/inventory-upload/{ticket}/complete",
+        "/ai/user/{id_external_user}/inventory-upload/{ticket}/signature",
+        "/ai/user/{id_external_user}/inventory-upload/{ticket}/complete",
         REPORT_ROUTE,
-        "/aether-api/v1/ai/report/{id_external_inventory}",
-        "/aether-api/v1/oauth/authorize",
-        "/aether-api/v1/oauth/token",
+        "/ai/report/{id_external_inventory}",
+        "/ai/oauth/authorize",
+        "/ai/oauth/token",
     ],
 )
 def test_every_documented_route_is_registered(api_main, path):
@@ -74,7 +75,7 @@ def test_every_documented_route_is_registered(api_main, path):
     assert path in api_main.app.openapi()["paths"]
 
 
-MCP_PREFIX = "/aether-api/v1/mcp"
+MCP_PREFIX = "/ai/mcp"
 
 
 def registered_route_paths(app):
@@ -103,7 +104,7 @@ def test_oauth_well_known_routes_are_registered(api_main):
 
     assert "/.well-known/oauth-authorization-server" in paths
     assert "/.well-known/oauth-protected-resource" in paths
-    assert "/aether-api/v1/mcp/.well-known/oauth-protected-resource" in paths
+    assert "/ai/mcp/.well-known/oauth-protected-resource" in paths
 
 
 def test_chatgpt_mcp_app_is_mounted_at_the_documented_prefix(api_main):
@@ -283,7 +284,7 @@ def test_get_user_runs_through_the_concrete_repository():
     """Verify that get user runs through the concrete repository."""
     database = StubDatabase(user=StubCollection(find_one_result=USER_DOCUMENT))
 
-    response = build_client(user_handlers.router, database).get("/aether-api/v1/ai/user/12345")
+    response = build_client(user_handlers.router, database).get("/ai/user/12345")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -298,7 +299,7 @@ def test_get_user_returns_404_when_the_document_does_not_exist():
     """Verify that get user returns 404 when the document does not exist."""
     database = StubDatabase(user=StubCollection(find_one_result=None))
 
-    response = build_client(user_handlers.router, database).get("/aether-api/v1/ai/user/12345")
+    response = build_client(user_handlers.router, database).get("/ai/user/12345")
 
     assert response.status_code == 404
 
@@ -307,7 +308,7 @@ def test_get_user_sessions_runs_through_the_concrete_repository():
     """Verify that get user sessions runs through the concrete repository."""
     database = StubDatabase(session=StubCollection(find_result=[SESSION_DOCUMENT]))
 
-    response = build_client(session_handlers.router, database).get(f"/aether-api/v1/ai/sessions/user/{ID_USER}")
+    response = build_client(session_handlers.router, database).get(f"/ai/sessions/user/{ID_USER}")
 
     assert response.status_code == 200
     assert response.json() == [{"id": ID_SESSION, "name": "Weekly emissions review"}]
@@ -318,7 +319,7 @@ def test_get_session_messages_runs_through_the_concrete_repository():
     document = {"messages": [{"input": "hi", "output": "ho", "submitted_at": "2026-07-26T14:30:00"}]}
     database = StubDatabase(session=StubCollection(find_one_result=document))
 
-    response = build_client(session_handlers.router, database).get(f"/aether-api/v1/ai/session/{ID_SESSION}/messages")
+    response = build_client(session_handlers.router, database).get(f"/ai/session/{ID_SESSION}/messages")
 
     assert response.status_code == 200
     assert response.json() == [

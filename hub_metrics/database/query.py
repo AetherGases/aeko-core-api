@@ -11,6 +11,7 @@ def create_metric_query(metric: Metric) -> dict:
         "latency": metric.latency,
         "response_status": metric.response_status,
         "endpoint": metric.endpoint,
+        "origin": metric.origin,
     }
 
     if metric.id is not None:

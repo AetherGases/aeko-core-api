@@ -34,7 +34,7 @@ def test_package_constants_have_one_definition_module(package):
             )
             for target in targets:
                 if isinstance(target, ast.Name) and target.id.isupper():
-                    if target.id in {"CHROMA_SESSION", "MONGO_SESSION", "TAVILY_SESSION"}:
+                    if target.id in {"CHROMA_SESSION", "MONGO_SESSION"}:
                         continue
                     misplaced.append(f"{path.name}:{target.id}")
     assert not misplaced, misplaced

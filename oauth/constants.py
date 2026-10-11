@@ -14,9 +14,9 @@ OAUTH_CLIENT_ID = os.environ["OAUTH_CLIENT_ID"]
 OAUTH_AUTHORIZATION_CODE_TTL_SECONDS = int(os.environ["OAUTH_AUTHORIZATION_CODE_TTL_SECONDS"])
 OAUTH_ACCESS_TOKEN_TTL_SECONDS = int(os.environ["OAUTH_ACCESS_TOKEN_TTL_SECONDS"])
 
-AUTHORIZE_PATH = "/aether-api/v1/oauth/authorize"
-TOKEN_PATH = "/aether-api/v1/oauth/token"
+AUTHORIZE_PATH = "/ai/oauth/authorize"
+TOKEN_PATH = "/ai/oauth/token"
 PROTECTED_RESOURCE_WELL_KNOWN_PATH = "/.well-known/oauth-protected-resource"
 MCP_PROTECTED_RESOURCE_WELL_KNOWN_PATH = (
-    "/aether-api/v1/mcp/.well-known/oauth-protected-resource"
+    "/ai/mcp/.well-known/oauth-protected-resource"
 )

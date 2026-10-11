@@ -201,8 +201,8 @@ def test_each_entry_is_coloured_by_its_own_outcome(monkeypatch):
 
 def test_the_header_replaces_the_access_line():
     """Verify that the header replaces the access line."""
-    assert header("POST", "/aether-api/v1/ai/user/session/message", 200, "4823.1ms", [OK, SLOW]) == (
-        "POST /aether-api/v1/ai/user/session/message -> 200 in 4823.1ms (2 operations)"
+    assert header("POST", "/ai/user/session/message", 200, "4823.1ms", [OK, SLOW]) == (
+        "POST /ai/user/session/message -> 200 in 4823.1ms (2 operations)"
     )
 
 
@@ -326,11 +326,11 @@ def test_a_request_closes_with_one_block(capsys):
         build_app([(Module.DATABASE, "user.get_user"), (Module.TOOL, "calculator")])
     )
 
-    asyncio.run(call(app, "POST", "/aether-api/v1/ai/user/session/message"))
+    asyncio.run(call(app, "POST", "/ai/user/session/message"))
 
     (block,) = blocks(capsys)
     assert HEADER.match(block[0])["description"] == (
-        "POST /aether-api/v1/ai/user/session/message -> 200 in "
+        "POST /ai/user/session/message -> 200 in "
         + HEADER.match(block[0])["description"].split(" in ")[1]
     )
     assert "(2 operations)" in block[0]

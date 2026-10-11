@@ -11,9 +11,9 @@ from internal.http import session_handlers
 from session.entity import Message, Session
 from session.session import GuardrailRejectedError
 
-SESSIONS_ROUTE = "/aether-api/v1/ai/sessions/user/{id_user}"
-MESSAGES_ROUTE = "/aether-api/v1/ai/session/{id_session}/messages"
-SEND_ROUTE = "/aether-api/v1/ai/user/session/message"
+SESSIONS_ROUTE = "/ai/sessions/user/{id_user}"
+MESSAGES_ROUTE = "/ai/session/{id_session}/messages"
+SEND_ROUTE = "/ai/user/session/message"
 
 SUBMITTED_AT = datetime(2026, 7, 26, 14, 30, 0)
 
@@ -272,6 +272,108 @@ def test_send_message_maps_unexpected_error_to_500(patched_user_repository):
 
     assert response.status_code == 500
     assert "boom" in response.json()["detail"]
+
+
+COST_ROUTE = "/ai/sessions/cost"
+
+
+class StubMetricsService:
+    def __init__(self, result=None, error=None):
+        self.result = result
+        self.error = error
+        self.calls = []
+
+    def add_metric(self, metric):
+        """Store a metric through the repository and return the stored entity."""
+        raise NotImplementedError
+
+    def get_all_metrics(self):
+        """Retrieve all stored metrics."""
+        raise NotImplementedError
+
+    def company_cost(self, n, id_external_company):
+        """Return the scripted company cost or raise the configured error."""
+        self.calls.append((n, id_external_company))
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+
+def build_cost_client(service=None, db="fake-db"):
+    """Build a client for the sessions cost route with a stub metrics service."""
+    app = FastAPI()
+    app.include_router(session_handlers.router)
+    app.state.db = db
+    if service is not None:
+        app.dependency_overrides[session_handlers.get_aeko_metrics_service] = lambda: service
+    return TestClient(app)
+
+
+def test_the_sessions_cost_route_returns_company_total_and_users():
+    """Verify that the sessions cost route returns company total and users."""
+    from aeko_metrics.entity import CompanyCost, UserCost
+
+    service = StubMetricsService(
+        result=CompanyCost(
+            id_external_company=90,
+            cost_usd=0.45,
+            users=[
+                UserCost(id_external_user=1, cost_usd=0.25),
+                UserCost(id_external_user=2, cost_usd=0.20),
+            ],
+        )
+    )
+    response = build_cost_client(service).get(
+        COST_ROUTE, params={"n": 7, "id_external_company": 90}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id_external_company": 90,
+        "cost_usd": 0.45,
+        "users": [
+            {"id_external_user": 1, "cost_usd": 0.25},
+            {"id_external_user": 2, "cost_usd": 0.20},
+        ],
+    }
+    assert service.calls == [(7, 90)]
+
+
+def test_the_sessions_cost_route_maps_value_error_to_400():
+    """Verify that the sessions cost route maps value error to 400."""
+    service = StubMetricsService(error=ValueError("n must be a positive integer."))
+    response = build_cost_client(service).get(
+        COST_ROUTE, params={"n": 0, "id_external_company": 90}
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "n must be a positive integer."
+
+
+def test_the_sessions_cost_route_maps_unexpected_error_to_500():
+    """Verify that the sessions cost route maps unexpected error to 500."""
+    service = StubMetricsService(error=RuntimeError("boom"))
+    response = build_cost_client(service).get(
+        COST_ROUTE, params={"n": 7, "id_external_company": 90}
+    )
+
+    assert response.status_code == 500
+    assert "boom" in response.json()["detail"]
+
+
+def test_the_sessions_cost_route_returns_503_when_database_is_not_initialized():
+    """Verify that the sessions cost route returns 503 when database is not initialized."""
+    response = build_cost_client(service=None, db=None).get(
+        COST_ROUTE, params={"n": 7, "id_external_company": 90}
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Database is not initialized"
+
+
+def test_the_sessions_cost_route_is_registered_on_the_application(api_main):
+    """Verify that the sessions cost route is registered on the application."""
+    assert "get" in api_main.app.openapi()["paths"].get(COST_ROUTE, {})
 
 
 def test_send_message_runs_the_blocking_sdk_call_off_the_event_loop(patched_user_repository):

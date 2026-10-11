@@ -6,6 +6,7 @@ cache, agent tools, and metric sinks and closes database, cache, and MCP connect
 """
 
 from contextlib import asynccontextmanager
+import json
 import os
 import threading
 
@@ -33,16 +34,20 @@ from cmd.api.tools.mongo_tools import (
     get_user_memory_tools,
     get_session_tools,
 )
-from cmd.api.integrations.mcp.tavily_mcp import (
-    TAVILY_SESSION,
+from cmd.api.integrations.tavily_api import (
     get_tavily_search_tools,
     get_tavily_site_map_tool,
 )
 from cmd.api.tools.calculator import get_calculator_tools
 from cmd.api.tools.finance import get_roi_payback_tools
+from aeko_metrics.cost import cost_usd as usd_cost
 from aeko_metrics.database.repository import Repository as AekoMetricsRepository
 from aeko_metrics.entity import AgentMetric, Metric as AekoMetric
 from aeko_metrics.service import Service as AekoMetricsService
+from internal.shared.event_tracking import (
+    current_metric_id_external_company,
+    current_metric_id_external_user,
+)
 from hub_metrics.database.repository import Repository as HubMetricsRepository
 from hub_metrics.entity import Metric
 from hub_metrics.service import Service as HubMetricsService
@@ -166,9 +171,9 @@ AEKO_TOOLS = {
 }
 
 
-MCP_SESSIONS = (TAVILY_SESSION, CHROMA_SESSION)
+MCP_SESSIONS = (CHROMA_SESSION,)
 
-CHATGPT_MCP_PREFIX = "/aether-api/v1/mcp"
+CHATGPT_MCP_PREFIX = "/ai/mcp"
 
 chatgpt_mcp = build_mcp_server()
 chatgpt_mcp_app = wrap_mcp_auth(chatgpt_mcp.streamable_http_app())
@@ -304,11 +309,11 @@ def build_metric_sink(database):
         """Persist the supplied tracking data through the configured metric service."""
         service.add_metric(
             Metric(
-
                 id=event.id_request,
                 latency=event.latency,
                 response_status=event.response_status,
                 endpoint=event.endpoint,
+                origin=event.origin,
             )
         )
 
@@ -319,27 +324,30 @@ def build_aeko_metrics_sink(database):
     """Build a callback that stores SDK run metrics and agent invocations in call order."""
 
     service = AekoMetricsService(AekoMetricsRepository(database))
+    prices = json.loads(os.environ.get("AEKO_MODEL_PRICES") or "{}")
 
     def sink(metrics) -> None:
         """Persist the supplied tracking data through the configured metric service."""
+        agents = [
+            AgentMetric(
+                name=agent.name,
+                input_tokens=agent.input_tokens,
+                output_tokens=agent.output_tokens,
+                llm=agent.llm,
+                used_tools=list(agent.used_tools),
+            )
+            for agent in metrics.used_agents
+        ]
         service.add_metric(
             AekoMetric(
-
                 id_request=metrics.id_request,
                 latency=metrics.latency,
                 error_description=metrics.error_description,
                 flow=metrics.flow,
-                used_agents=[
-                    AgentMetric(
-                        name=agent.name,
-                        input_tokens=agent.input_tokens,
-                        output_tokens=agent.output_tokens,
-                        llm=agent.llm,
-                        used_tools=list(agent.used_tools),
-                    )
-
-                    for agent in metrics.used_agents
-                ],
+                cost_usd=usd_cost(agents, prices),
+                used_agents=agents,
+                id_external_user=current_metric_id_external_user(),
+                id_external_company=current_metric_id_external_company(),
             )
         )
 

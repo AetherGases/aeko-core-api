@@ -16,7 +16,7 @@ tags:
     description: 'Endpoints for reading the event tracking bases behind the observability dashboard: what the gateway did with each request, and what the AI run inside it cost.'
 
 paths:
-  /aether-api/v1/ai/user/{id_external_user}:
+  /ai/user/{id_external_user}:
     get:
       tags:
         - Users
@@ -66,7 +66,68 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving user: Error fetching user from database: ...'
-  /aether-api/v1/ai/sessions/user/{id_user}:
+  /ai/sessions/cost:
+    get:
+      tags:
+        - Sessions
+      summary: Sum session and SDK cost for a company
+      description: Returns USD spent in the last n days by runs that snapshotted the given company, grouped by external user.
+      operationId: getCompanySessionCost
+      parameters:
+        - name: n
+          in: query
+          required: true
+          description: Number of trailing days to include.
+          schema:
+            type: integer
+          example: 7
+        - name: id_external_company
+          in: query
+          required: true
+          description: External company identifier snapshotted on billed runs.
+          schema:
+            type: integer
+          example: 90
+      responses:
+        '200':
+          description: Company cost for the requested window.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyCostResponseData'
+              example:
+                id_external_company: 90
+                cost_usd: 0.45
+                users:
+                  - id_external_user: 1
+                    cost_usd: 0.25
+                  - id_external_user: 2
+                    cost_usd: 0.20
+        '400':
+          description: n or id_external_company is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: n must be a positive integer.
+        '503':
+          description: Database connection is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Database is not initialized
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: 'Error retrieving company cost: ...'
+  /ai/sessions/user/{id_user}:
     get:
       tags:
         - Sessions
@@ -117,7 +178,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving user sessions: ...'
-  /aether-api/v1/ai/session/{id_session}/messages:
+  /ai/session/{id_session}/messages:
     get:
       tags:
         - Sessions
@@ -169,7 +230,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving session messages: ...'
-  /aether-api/v1/ai/user/session/message:
+  /ai/user/session/message:
     post:
       tags:
         - Sessions
@@ -221,7 +282,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: Aeko SDK is not initialized
-  /aether-api/v1/ai/report:
+  /ai/report:
     post:
       tags:
         - Reports
@@ -308,7 +369,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error processing report: ...'
-  /aether-api/v1/ai/report/{id_external_inventory}:
+  /ai/report/{id_external_inventory}:
     get:
       tags:
         - Reports
@@ -358,7 +419,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving report: ...'
-  /aether-api/v1/ai/hub-metrics:
+  /ai/hub-metrics:
     get:
       tags:
         - Metrics
@@ -378,7 +439,8 @@ paths:
                 - id: 65a8b3d6c0f8e1d7f4b2c0aa
                   latency: 12.4ms
                   response_status: 200
-                  endpoint: /aether-api/v1/ai/user/{id_external_user}
+                  endpoint: /ai/user/{id_external_user}
+                  origin: internal
         '503':
           description: Database connection is unavailable.
           content:
@@ -395,7 +457,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 detail: 'Error retrieving metrics: ...'
-  /aether-api/v1/ai/aeko-metrics:
+  /ai/aeko-metrics:
     get:
       tags:
         - Metrics
@@ -417,6 +479,7 @@ paths:
                   latency: 4823
                   error_description: null
                   flow: conversational
+                  cost_usd: 0.000015
                   used_agents:
                     - name: Analista de Poluentes
                       input_tokens: 11
@@ -469,6 +532,42 @@ components:
         - id_external_user
         - role
         - usecase
+    UserCostResponseData:
+      type: object
+      properties:
+        id_external_user:
+          type: integer
+          description: External user identifier whose runs were billed.
+          example: 12345
+        cost_usd:
+          type: number
+          format: float
+          description: USD spent by this user in the requested window.
+          example: 0.25
+      required:
+        - id_external_user
+        - cost_usd
+    CompanyCostResponseData:
+      type: object
+      properties:
+        id_external_company:
+          type: integer
+          description: External company identifier snapshotted on the billed runs.
+          example: 90
+        cost_usd:
+          type: number
+          format: float
+          description: USD spent by every user of this company in the requested window.
+          example: 0.45
+        users:
+          type: array
+          description: Per-user USD totals inside the same window.
+          items:
+            $ref: '#/components/schemas/UserCostResponseData'
+      required:
+        - id_external_company
+        - cost_usd
+        - users
     SessionResponseData:
       type: object
       properties:
@@ -696,12 +795,17 @@ components:
         endpoint:
           type: string
           description: Route template the request matched.
-          example: /aether-api/v1/ai/user/{id_external_user}
+          example: /ai/user/{id_external_user}
+        origin:
+          type: string
+          description: Whether the request came from the ChatGPT MCP plugin or the internal HTTP API.
+          example: internal
       required:
         - id
         - latency
         - response_status
         - endpoint
+        - origin
     AgentMetricResponseData:
       type: object
       properties:
@@ -762,6 +866,10 @@ components:
             - conversational
             - analytical
           example: conversational
+        cost_usd:
+          type: number
+          description: Estimated USD cost of the run from token usage and the configured per-model price table.
+          example: 0.000015
         used_agents:
           type: array
           items:
@@ -772,4 +880,5 @@ components:
         - id_request
         - latency
         - flow
+        - cost_usd
         - used_agents

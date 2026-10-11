@@ -11,10 +11,10 @@ from fastapi.testclient import TestClient
 
 CHATGPT_REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect"
 VERIFIER = "verifier-12345678901234567890123456789012"
-AUTHORIZE_PATH = "/aether-api/v1/oauth/authorize"
-TOKEN_PATH = "/aether-api/v1/oauth/token"
+AUTHORIZE_PATH = "/ai/oauth/authorize"
+TOKEN_PATH = "/ai/oauth/token"
 ISSUER = "https://aeko.example.com"
-AUDIENCE = "https://aeko.example.com/aether-api/v1/mcp/"
+AUDIENCE = "https://aeko.example.com/ai/mcp/"
 
 
 def s256(verifier: str) -> str:
@@ -143,8 +143,8 @@ def test_authorization_server_metadata(oauth_env):
     body = response.json()
     assert response.status_code == 200
     assert body["issuer"] == ISSUER
-    assert body["authorization_endpoint"].endswith("/aether-api/v1/oauth/authorize")
-    assert body["token_endpoint"].endswith("/aether-api/v1/oauth/token")
+    assert body["authorization_endpoint"].endswith("/ai/oauth/authorize")
+    assert body["token_endpoint"].endswith("/ai/oauth/token")
     assert body["code_challenge_methods_supported"] == ["S256"]
     assert body["response_types_supported"] == ["code"]
     assert body["grant_types_supported"] == ["authorization_code"]
@@ -197,7 +197,7 @@ def test_get_authorize_returns_sign_in_html(oauth_env):
 def test_protected_resource_metadata_at_mcp_path(oauth_env):
     """Verify that protected-resource metadata is also served on the MCP resource path."""
     response = build_client(StubOAuthService()).get(
-        "/aether-api/v1/mcp/.well-known/oauth-protected-resource"
+        "/ai/mcp/.well-known/oauth-protected-resource"
     )
     body = response.json()
     assert response.status_code == 200

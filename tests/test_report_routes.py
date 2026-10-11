@@ -8,8 +8,8 @@ from improvement_plan.entity import ExtractedInventory, ImprovementPlan, Invento
 from improvement_plan.improvement_plan import MalformedPlanError
 from internal.http import improvement_plan_handlers
 
-ROUTE = "/aether-api/v1/ai/report"
-GET_ROUTE = "/aether-api/v1/ai/report/{id_external_inventory}"
+ROUTE = "/ai/report"
+GET_ROUTE = "/ai/report/{id_external_inventory}"
 
 INVENTORY_MARKDOWN = "## Escopo 1\n\n| Fonte | tCO2e |\n| --- | --- |\n| Caldeira | 12400 |"
 

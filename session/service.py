@@ -68,10 +68,14 @@ class Service(IService):
             messenger = aeko_messenger_factory(user, memories)
 
             response = _run(
-                messenger, input, aeko_session_factory(session), current_id_request()
+                messenger, input, aeko_session_factory(session), current_id_request(), user
             )
 
-            record_aeko_metrics(response.aeko_metrics)
+            record_aeko_metrics(
+                response.aeko_metrics,
+                id_external_user=user.id_external_user,
+                id_external_company=user.id_external_company,
+            )
 
             message = _internal_message_from_aeko_message(response.message)
 
@@ -115,13 +119,17 @@ class Service(IService):
         except Exception as e:
             raise RuntimeError(f"Error validating session and user allowance: {e}")
 
-def _run(messenger, input: str, session, id_request: str):
+def _run(messenger, input: str, session, id_request: str, user):
     """Send a conversation turn and record metrics attached to any raised exception."""
 
     try:
         return messenger.send_message(input, session, id_request=id_request)
     except Exception as exc:
-        record_aeko_metrics(getattr(exc, "aeko_metrics", None))
+        record_aeko_metrics(
+            getattr(exc, "aeko_metrics", None),
+            id_external_user=user.id_external_user,
+            id_external_company=user.id_external_company,
+        )
         raise
 
 

@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from internal.http import user_handlers
 from user.entity import User
 
-ROUTE = "/aether-api/v1/ai/user/{id_external_user}"
+ROUTE = "/ai/user/{id_external_user}"
 
 
 class StubUserService:

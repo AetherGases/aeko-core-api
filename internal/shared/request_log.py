@@ -29,6 +29,7 @@ from internal.shared.event_tracking import (
     bind_id_request,
     endpoint_of,
     new_id_request,
+    origin_of,
     record_event,
     unbind_id_request,
 )
@@ -190,6 +191,7 @@ class RequestLogMiddleware:
                 latency=elapsed,
                 response_status=status if status is not None else CRASHED_STATUS,
                 endpoint=endpoint_of(scope),
+                origin=origin_of(path),
             )
         )
         emit(method, path, status, elapsed, records, error)

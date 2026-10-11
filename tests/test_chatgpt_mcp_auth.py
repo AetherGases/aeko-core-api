@@ -6,13 +6,13 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-MCP_PREFIX = "/aether-api/v1/mcp"
+MCP_PREFIX = "/ai/mcp"
 MCP_HEADERS = {
     "Accept": "application/json, text/event-stream",
     "Content-Type": "application/json",
 }
 RESOURCE_METADATA = (
-    "https://aeko.example.com/aether-api/v1/mcp/.well-known/oauth-protected-resource"
+    "https://aeko.example.com/ai/mcp/.well-known/oauth-protected-resource"
 )
 AUTHENTICATED_CALLS = (
     ("ask_aeko", {"input": "hi"}),
@@ -38,7 +38,7 @@ def oauth_env(monkeypatch):
     """Set OAuth environment variables used by the MCP challenge string."""
     monkeypatch.setenv("OAUTH_SIGNING_KEY", "test-signing-key")
     monkeypatch.setenv("OAUTH_ISSUER", "https://aeko.example.com")
-    monkeypatch.setenv("OAUTH_AUDIENCE", "https://aeko.example.com/aether-api/v1/mcp/")
+    monkeypatch.setenv("OAUTH_AUDIENCE", "https://aeko.example.com/ai/mcp/")
     monkeypatch.setenv("OAUTH_CLIENT_ID", "chatgpt")
     monkeypatch.setenv("OAUTH_AUTHORIZATION_CODE_TTL_SECONDS", "300")
     monkeypatch.setenv("OAUTH_ACCESS_TOKEN_TTL_SECONDS", "3600")

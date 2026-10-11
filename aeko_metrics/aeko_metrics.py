@@ -1,8 +1,9 @@
 """Define service and repository contracts for SDK run metrics."""
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 
-from aeko_metrics.entity import Metric
+from aeko_metrics.entity import CompanyCost, Metric
 
 class IRepository(ABC):
     @abstractmethod
@@ -15,6 +16,11 @@ class IRepository(ABC):
         """Retrieve all stored metrics."""
         pass
 
+    @abstractmethod
+    def get_company_metrics(self, id_external_company: int, since: datetime) -> list[Metric]:
+        """Retrieve metrics for one company at or after the supplied time."""
+        pass
+
 class IService(ABC):
     @abstractmethod
     def add_metric(self, metric: Metric) -> Metric:
@@ -24,4 +30,9 @@ class IService(ABC):
     @abstractmethod
     def get_all_metrics(self) -> list[Metric]:
         """Retrieve all stored metrics."""
+        pass
+
+    @abstractmethod
+    def company_cost(self, n: int, id_external_company: int) -> CompanyCost:
+        """Sum USD cost for a company over the trailing n days, grouped by user."""
         pass
